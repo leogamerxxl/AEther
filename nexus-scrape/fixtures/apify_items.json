@@ -1,0 +1,6 @@
+[
+  {"property_external_id": "hotel-vega-fixture", "stay_date": "2026-06-13", "room_type": "Double Standard", "price": 486.0, "currency": "RON", "availability": "available", "rooms_left": 4, "refundable": true, "breakfast": true, "genius": false},
+  {"property_external_id": "hotel-vega-fixture", "stay_date": "2026-06-14", "room_type": "Double Standard", "price": 512.0, "currency": "RON", "availability": "available", "rooms_left": 2, "refundable": true, "breakfast": true, "genius": false},
+  {"property_external_id": "hotel-amiral-fixture", "stay_date": "2026-06-13", "room_type": "Twin", "price": 433.0, "currency": "RON", "rooms_left": 0, "soldOut": true},
+  {"property_external_id": "hotel-amiral-fixture", "stay_date": "2026-06-14", "room_type": "Twin", "price": null, "currency": "RON"}
+]

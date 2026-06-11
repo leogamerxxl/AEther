@@ -1,0 +1,3 @@
+# Tier 1 collectors are stdlib-only by design (plan s7).
+# Optional - OTB Google Sheet channel only:
+# google-auth>=2.23

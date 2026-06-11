@@ -1,0 +1,11 @@
+{
+  "_note": "REAL DB snapshot of collector_status, captured 2026-06-12 via MCP. inputs empty: last rates day (2026-05-22) has no future stay_dates; no OWM/OTB rows; legacy FX rows use old metric codes.",
+  "simulated": false,
+  "status": [
+    {"agent_code": "collector.booking_rates", "last_observed_at": "2026-05-22T09:39:12+00:00", "row_count_today": 0, "last_success_at": null, "last_error": null, "freshness_state": "dead", "blocks_brief": true},
+    {"agent_code": "collector.bnr_fx", "last_observed_at": "2026-05-22T09:39:58+00:00", "row_count_today": 0, "last_success_at": null, "last_error": null, "freshness_state": "dead", "blocks_brief": false},
+    {"agent_code": "collector.otb", "last_observed_at": null, "row_count_today": 0, "last_success_at": null, "last_error": null, "freshness_state": "dead", "blocks_brief": false},
+    {"agent_code": "collector.weather", "last_observed_at": null, "row_count_today": 0, "last_success_at": null, "last_error": null, "freshness_state": "dead", "blocks_brief": false}
+  ],
+  "inputs": []
+}

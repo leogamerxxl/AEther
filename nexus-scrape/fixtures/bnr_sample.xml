@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DataSet xmlns="http://www.bnr.ro/xsd">
+  <Header><Publisher>BNR</Publisher></Header>
+  <Body>
+    <Cube date="2026-06-10">
+      <Rate currency="EUR">5.0712</Rate>
+      <Rate currency="USD">4.6630</Rate>
+      <Rate currency="HUF" multiplier="100">1.2710</Rate>
+    </Cube>
+  </Body>
+</DataSet>

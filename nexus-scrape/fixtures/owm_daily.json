@@ -1,0 +1,11 @@
+{
+  "daily": [
+    {"date": "2026-06-12", "temp": {"max": 27.4}, "pop": 0.05, "wind_speed": 4.8, "humidity": 58},
+    {"date": "2026-06-13", "temp": {"max": 29.1}, "pop": 0.00, "wind_speed": 5.6, "humidity": 52},
+    {"date": "2026-06-14", "temp": {"max": 30.2}, "pop": 0.10, "wind_speed": 6.1, "humidity": 55},
+    {"date": "2026-06-15", "temp": {"max": 26.0}, "pop": 0.45, "wind_speed": 9.4, "humidity": 71},
+    {"date": "2026-06-16", "temp": {"max": 24.8}, "pop": 0.60, "wind_speed": 11.2, "humidity": 76},
+    {"date": "2026-06-17", "temp": {"max": 27.0}, "pop": 0.15, "wind_speed": 7.0, "humidity": 60},
+    {"date": "2026-06-18", "temp": {"max": 28.3}, "pop": 0.05, "wind_speed": 5.2, "humidity": 57}
+  ]
+}

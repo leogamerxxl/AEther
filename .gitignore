@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.vercel/
+.env*
+!.env.example
+__pycache__/
+*.pyc
+nexus-brief/build/
+.DS_Store
+*.tsbuildinfo*.log
