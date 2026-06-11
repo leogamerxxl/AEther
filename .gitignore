@@ -7,4 +7,5 @@ __pycache__/
 *.pyc
 nexus-brief/build/
 .DS_Store
-*.tsbuildinfo*.log
+*.tsbuildinfo
+*.log
