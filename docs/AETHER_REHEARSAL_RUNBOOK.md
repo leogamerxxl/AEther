@@ -91,7 +91,7 @@ python status.py                  # after 02:35 UTC: all fresh
 | `SUPABASE_URL` | known | all | — |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard → Settings → API | all writes | the one key that must never leave the VPS |
 | `APIFY_API_TOKEN` / `APIFY_ACTOR` | Apify console | rates | actor schema verified per §1.6d before first live run |
-| `OWM_API_KEY` | OpenWeatherMap | weather | **One Call 3.0 requires subscribing** (free 1k/day tier, card on file) — 401 means subscription, not key |
+| `VISUALCROSSING_API_KEY` | Visual Crossing | weather | free tier 1k records/day, no card; metric units (verified live 2026-06-12) |
 | `RESEND_API_KEY` / `BRIEF_FROM` | Resend | send, alerts | unverified domain ⇒ `onboarding@resend.dev` sender, deliverable only to your own Resend account email — fine for step 11, verify domain before owner delivery |
 | `BRIEF_RECIPIENTS` | = leonardocozaciuc@gmail.com (rehearsal) | send | owner address added only after Go |
 | `ALERT_EMAIL` / `ALERT_FROM` | yours | fail-loud | — |
