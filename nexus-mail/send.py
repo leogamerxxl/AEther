@@ -24,7 +24,8 @@ AGENT = "mail.send"
 def resend_post(key, payload):
     req = urllib.request.Request(
         "https://api.resend.com/emails", method="POST",
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
+                 "User-Agent": "AetherCollector/1.0"},
         data=json.dumps(payload).encode())
     with urllib.request.urlopen(req, timeout=60, context=ssl_context()) as r:
         return json.loads(r.read().decode())

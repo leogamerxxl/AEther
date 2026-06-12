@@ -48,7 +48,8 @@ def alert(stage, detail):
                        "text": msg}).encode()
     req = urllib.request.Request("https://api.resend.com/emails", data=body, method="POST",
                                  headers={"Authorization": f"Bearer {key}",
-                                          "Content-Type": "application/json"})
+                                          "Content-Type": "application/json",
+                                          "User-Agent": "AetherCollector/1.0"})
     try:
         urllib.request.urlopen(req, timeout=30, context=ssl_context())
     except Exception as e:  # noqa: BLE001
