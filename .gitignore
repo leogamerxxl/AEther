@@ -9,3 +9,4 @@ nexus-brief/build/
 .DS_Store
 *.tsbuildinfo
 *.log
+_*.py
