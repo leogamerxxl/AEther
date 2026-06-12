@@ -1,10 +1,13 @@
-# AETHER Tier 1 pipeline - times in UTC (EEST = UTC+3). Install: crontab crontab.txt
-# Prereq: chmod +x run.sh ; .venv created ; .env filled (chmod 600).
-30 11 * * * /home/aether/aether/nexus-scrape/run.sh fx       >> /home/aether/cron.log 2>&1
-30  1 * * * /home/aether/aether/nexus-scrape/run.sh rates    >> /home/aether/cron.log 2>&1
-45  1 * * * /home/aether/aether/nexus-scrape/run.sh weather  >> /home/aether/cron.log 2>&1
- 0  2 * * * /home/aether/aether/nexus-scrape/run.sh otb      >> /home/aether/cron.log 2>&1
-30  2 * * * /home/aether/aether/nexus-scrape/run.sh validate >> /home/aether/cron.log 2>&1
- 0  3 * * * /home/aether/aether/nexus-scrape/run.sh brief    >> /home/aether/cron.log 2>&1
-45  3 * * * /home/aether/aether/nexus-scrape/run.sh send     >> /home/aether/cron.log 2>&1
-55  3 * * * /home/aether/aether/nexus-scrape/run.sh sentinel >> /home/aether/cron.log 2>&1
+# AETHER Tier 1 pipeline - LOCAL TIMES. Server timezone MUST be Europe/Bucharest:
+#   sudo timedatectl set-timezone Europe/Bucharest && date
+# Install:  crontab /home/aether/aether/nexus-scrape/crontab.txt
+# Prereqs:  chmod +x run.sh ; .venv created ; .env filled (chmod 600)
+SHELL=/bin/bash
+30 14 * * * flock -n /tmp/aether-fx.lock       /home/aether/aether/nexus-scrape/run.sh fx       >> /home/aether/cron.log 2>&1
+30  4 * * * flock -n /tmp/aether-rates.lock    /home/aether/aether/nexus-scrape/run.sh rates    >> /home/aether/cron.log 2>&1
+45  4 * * * flock -n /tmp/aether-weather.lock  /home/aether/aether/nexus-scrape/run.sh weather  >> /home/aether/cron.log 2>&1
+ 0  5 * * * flock -n /tmp/aether-otb.lock      /home/aether/aether/nexus-scrape/run.sh otb      >> /home/aether/cron.log 2>&1
+30  5 * * * flock -n /tmp/aether-validate.lock /home/aether/aether/nexus-scrape/run.sh validate >> /home/aether/cron.log 2>&1
+ 0  6 * * * flock -n /tmp/aether-brief.lock    /home/aether/aether/nexus-scrape/run.sh brief    >> /home/aether/cron.log 2>&1
+45  6 * * * flock -n /tmp/aether-send.lock     /home/aether/aether/nexus-scrape/run.sh send     >> /home/aether/cron.log 2>&1
+55  6 * * * /home/aether/aether/nexus-scrape/run.sh sentinel >> /home/aether/cron.log 2>&1

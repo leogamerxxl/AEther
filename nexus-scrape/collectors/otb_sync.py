@@ -26,6 +26,7 @@ CAPACITY = int(os.environ.get("OTB_CAPACITY", "52"))
 
 
 def read_rows(csv_path=None):
+    csv_path = csv_path or os.environ.get("OTB_CSV_PATH")
     if csv_path:
         text = Path(csv_path).read_text(encoding="utf-8-sig")
         return list(csv.DictReader(io.StringIO(text))), {"channel": "csv", "path": csv_path}

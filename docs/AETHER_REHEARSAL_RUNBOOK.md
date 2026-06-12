@@ -71,7 +71,8 @@ python nexus-mail/send.py --to leonardocozaciuc@gmail.com   # step 11 — test s
 
 ### Steps 12–13 — cron + supervised cycle
 ```bash
-crontab -e    # paste from nexus-scrape/.env.example (UTC):
+sudo timedatectl set-timezone Europe/Bucharest   # TZ DECISION: server runs Bucharest local
+crontab nexus-scrape/crontab.txt                  # local times + flock; see file header
 # 30 11 * * * cd /home/aether/aether/nexus-scrape && .venv/bin/python run_daily.py fx       >> /home/aether/cron.log 2>&1
 # 30  1 * * * cd /home/aether/aether/nexus-scrape && .venv/bin/python run_daily.py rates    >> /home/aether/cron.log 2>&1
 # 45  1 * * * ... weather | 0 2 ... otb | 30 2 ... validate | 0 3 ... brief | 45 3 ... send | 55 3 ... sentinel
