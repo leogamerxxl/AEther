@@ -1,21 +1,17 @@
-"""Competitor rates collector: Apify Booking actor -> rate_observations. Plan s2.
+"""Competitor rates collector: Apify Booking actor -> rate_observations.
 
-Real mode: runs APIFY_ACTOR (run-sync-get-dataset-items) once per check-in date
-for the next RATES_DAYS days (default 14, horizon ramps at deploy), maps items
-to scraped_properties by booking_url/external_id, upserts idempotently per
-(scraped_property_id, stay_date, room_type) per observation day.
-
-DEPLOY-DAY SEAM (plan s12.3): normalize_item() maps the chosen actor's output
-to the normalized shape below - verify against the actor's real schema before
-first live run. Fixture mode (--fixture) consumes pre-normalized items.
-
-Normalized item: property_external_id | url, stay_date, room_type, price,
-currency, availability, rooms_left, refundable, breakfast, genius.
+Schema verified live 2026-06-12 against actor oeiQgfg5fsmIJB7Cn:
+  item.url (canonical), item.price (top-level RON total), item.currency ("lei"),
+  item.rooms[].roomsLeft (availability), item.name, item.stars.
+Strategy: one run per stay-date with startUrls = all resolved booking_urls;
+match returned items to scraped_properties by URL slug (/hotel/<cc>/<slug>).
+Properties without booking_url are skipped (run resolve step first).
 Usage: python collectors/booking_rates.py [--dry-run] [--fixture PATH]
 """
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.parse
 import urllib.request
@@ -29,45 +25,36 @@ from lib.sb import SB, SBError, iso, log_run, ssl_context, today_start_iso, utcn
 AGENT = "collector.booking_rates"
 RATES_DAYS = int(os.environ.get("RATES_DAYS", "14"))
 MIN_COVERAGE = int(os.environ.get("MIN_RATE_COVERAGE", "10"))
-ACTOR = os.environ.get("APIFY_ACTOR", "voyager~booking-scraper")
+ACTOR = os.environ.get("APIFY_ACTOR", "oeiQgfg5fsmIJB7Cn")
 
 
-def normalize_item(item, fallback_stay_date):
-    """Adapter seam: tolerant mapping over common Booking-actor field names."""
-    def first(*keys):
-        for k in keys:
-            v = item.get(k)
-            if v not in (None, ""):
-                return v
-        return None
-    price = first("price", "totalPrice", "minPrice")
+def slug(url):
+    """Stable Booking id: the /hotel/<cc>/<name> path, query/fragment stripped."""
+    m = re.search(r"/hotel/([a-z]{2})/([^/?#.]+)", (url or "").lower())
+    return f"{m.group(1)}/{m.group(2)}" if m else None
+
+
+def normalize_item(item):
+    price = item.get("price")
     try:
         price = round(float(price), 2) if price is not None else None
     except (TypeError, ValueError):
         price = None
-    rooms_left = first("rooms_left", "roomsLeft", "availableRooms")
-    try:
-        rooms_left = int(rooms_left) if rooms_left is not None else None
-    except (TypeError, ValueError):
-        rooms_left = None
-    sold_out = bool(first("soldOut", "sold_out")) or (rooms_left == 0)
-    return {
-        "property_external_id": first("property_external_id", "hotelId", "id"),
-        "url": first("url", "hotelUrl", "link"),
-        "stay_date": first("stay_date", "checkIn", "checkInDate") or fallback_stay_date,
-        "room_type": first("room_type", "roomType", "roomName") or "standard",
-        "price": price,
-        "currency": (first("currency", "currencyCode") or "RON").upper(),
-        "availability": "sold_out" if sold_out else (first("availability") or "available"),
-        "rooms_left": rooms_left,
-        "refundable": first("refundable", "isRefundable"),
-        "breakfast": first("breakfast", "hasBreakfast"),
-        "genius": first("genius", "isGenius"),
-    }
+    rooms = item.get("rooms") if isinstance(item.get("rooms"), list) else []
+    lefts = [r.get("roomsLeft") for r in rooms
+             if isinstance(r, dict) and r.get("available") and isinstance(r.get("roomsLeft"), int)]
+    rooms_left = min(lefts) if lefts else None
+    room_type = next((r.get("roomType") for r in rooms if isinstance(r, dict) and r.get("roomType")), "standard")
+    cur = (item.get("currency") or "RON").upper()
+    cur = "RON" if cur in ("LEI", "RON") else cur
+    sold_out = price is None and not lefts
+    return {"slug": slug(item.get("url")), "url": item.get("url"), "name": item.get("name"),
+            "price": price, "currency": cur, "room_type": str(room_type)[:120],
+            "rooms_left": rooms_left, "availability": "sold_out" if sold_out else "available"}
 
 
 def run_actor(token, input_obj):
-    url = (f"https://api.apify.com/v2/acts/{urllib.parse.quote(ACTOR, safe='~')}"
+    url = (f"https://api.apify.com/v2/acts/{urllib.parse.quote(ACTOR, safe='')}"
            f"/run-sync-get-dataset-items?token={token}&timeout=300")
     req = urllib.request.Request(url, method="POST",
                                  headers={"Content-Type": "application/json",
@@ -77,33 +64,15 @@ def run_actor(token, input_obj):
         return json.loads(r.read().decode())
 
 
-def match_property(norm, props):
-    ext = str(norm.get("property_external_id") or "")
-    url = str(norm.get("url") or "")
-    for p in props:
-        if ext and str(p.get("external_id")) == ext:
-            return p
-        bu = p.get("booking_url") or ""
-        if url and bu and (url.startswith(bu.split("?")[0]) or bu.split("?")[0] in url):
-            return p
-    return None
-
-
-def to_row(norm, prop_id, now_iso, raw_item):
-    if norm["price"] is None or not norm["stay_date"]:
+def to_row(norm, prop_id, stay_date, now_iso, raw_item):
+    if norm["price"] is None and norm["availability"] != "sold_out":
         return None
-    row = {
-        "scraped_property_id": prop_id, "source_id": pv.SOURCE_APIFY,
-        "observed_at": now_iso, "stay_date": str(norm["stay_date"])[:10],
-        "stay_length": 1, "room_type": str(norm["room_type"])[:120],
-        "rate_amount": norm["price"], "currency_code": norm["currency"],
-        "availability_state": norm["availability"], "rooms_remaining": norm["rooms_left"],
-        "is_refundable": bool(norm["refundable"]) if norm["refundable"] is not None else None,
-        "has_breakfast": bool(norm["breakfast"]) if norm["breakfast"] is not None else None,
-        "is_genius": bool(norm["genius"]) if norm["genius"] is not None else None,
-        "raw_jsonb": raw_item,
-    }
-    row["confidence"] = pv.rate_confidence(row)
+    row = {"scraped_property_id": prop_id, "source_id": pv.SOURCE_APIFY, "observed_at": now_iso,
+           "stay_date": stay_date, "stay_length": 1, "room_type": norm["room_type"],
+           "rate_amount": norm["price"] if norm["price"] is not None else 0,
+           "currency_code": norm["currency"], "availability_state": norm["availability"],
+           "rooms_remaining": norm["rooms_left"], "raw_jsonb": raw_item}
+    row["confidence"] = pv.rate_confidence(row) if norm["price"] else 0.5
     return row
 
 
@@ -111,33 +80,21 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--fixture")
+    ap.add_argument("--days", type=int, default=RATES_DAYS)
     a = ap.parse_args(argv)
     started = utcnow()
     now = iso(utcnow())
-    summary = {"simulated": bool(a.fixture), "items": 0, "parse_failures": 0,
-               "unmatched": 0, "inserted": 0, "patched": 0, "skipped": 0, "coverage": 0}
+    summary = {"simulated": bool(a.fixture), "runs": 0, "items": 0, "unmatched": 0,
+               "inserted": 0, "patched": 0, "skipped": 0, "coverage": 0}
 
     if a.fixture:
         items = json.loads(Path(a.fixture).read_text(encoding="utf-8"))
-        norms = [normalize_item(i, None) for i in items]
-        summary["items"] = len(norms)
-        rows = []
-        for n, raw in zip(norms, items):
-            r = to_row(n, n.get("property_external_id") or "UNRESOLVED(fixture)", now, raw)
-            if r is None:
-                summary["parse_failures"] += 1
-            else:
-                rows.append(r)
-        summary["coverage"] = len({r["scraped_property_id"] for r in rows})
-        if a.dry_run:
-            preview = [{k: r[k] for k in ("scraped_property_id", "stay_date", "room_type",
-                                          "rate_amount", "currency_code", "availability_state",
-                                          "rooms_remaining", "confidence")} for r in rows]
-            print(json.dumps({"agent": AGENT, "dry_run": True, **summary, "preview": preview}, indent=2))
-            return 0
-        print(json.dumps({"agent": AGENT, "status": "failed",
-                          "error": "fixture mode cannot write (unresolved property ids)"}))
-        return 2
+        for it in items:
+            n = normalize_item(it)
+            print(json.dumps({"matched_slug": n["slug"], "price": n["price"], "cur": n["currency"],
+                              "rooms_left": n["rooms_left"], "avail": n["availability"], "name": n["name"]}))
+        print(json.dumps({"agent": AGENT, "dry_run": True, "parsed": len(items)}))
+        return 0
 
     try:
         sb = SB()
@@ -147,30 +104,37 @@ def main(argv=None):
         return 2
 
     try:
-        props = sb.select("scraped_properties", select="id,external_id,booking_url,name") or []
-        if not props:
-            raise ValueError("no scraped_properties configured")
+        props = sb.select("scraped_properties", select="id,name,booking_url") or []
+        with_url = [p for p in props if p.get("booking_url")]
+        slug_map = {slug(p["booking_url"]): p for p in with_url if slug(p["booking_url"])}
+        if not slug_map:
+            log_run(sb, AGENT, "failed", {}, {"reason": "no booking_url resolved"}, started, error="no booking_url")
+            print(json.dumps({"agent": AGENT, "status": "failed",
+                              "error": "0 properties have booking_url - run URL resolver first"}))
+            return 2
+
         today = utcnow().date()
+        start_urls = [{"url": p["booking_url"]} for p in with_url]
         rows = []
-        for d in range(1, RATES_DAYS + 1):
+        for d in range(1, a.days + 1):
             checkin = today + timedelta(days=d)
             items = run_actor(token, {
-                "startUrls": [{"url": p["booking_url"]} for p in props if p.get("booking_url")],
-                "checkIn": checkin.isoformat(),
+                "startUrls": start_urls, "checkIn": checkin.isoformat(),
                 "checkOut": (checkin + timedelta(days=1)).isoformat(),
-                "currency": "RON", "language": "en-us", "maxItems": 200,
+                "currency": "RON", "language": "en-gb", "maxItems": len(start_urls) * 2,
+                "rooms": 1, "adults": 2, "children": 0,
+                "starsCountFilter": "any", "propertyType": "none", "minMaxPrice": "0-999999",
             }) or []
+            summary["runs"] += 1
             summary["items"] += len(items)
             for item in items:
-                norm = normalize_item(item, checkin.isoformat())
-                prop = match_property(norm, props)
-                if prop is None:
+                n = normalize_item(item)
+                prop = slug_map.get(n["slug"])
+                if not prop:
                     summary["unmatched"] += 1
                     continue
-                row = to_row(norm, prop["id"], now, item)
-                if row is None:
-                    summary["parse_failures"] += 1
-                else:
+                row = to_row(n, prop["id"], checkin.isoformat(), now, item)
+                if row:
                     rows.append(row)
 
         existing = sb.select("rate_observations",
@@ -180,26 +144,23 @@ def main(argv=None):
         for r in rows:
             k = (r["scraped_property_id"], r["stay_date"], r["room_type"])
             if k in emap:
-                if float(emap[k]["rate_amount"] or 0) != float(r["rate_amount"]):
-                    sb.patch("rate_observations", {"id": f"eq.{emap[k]['id']}"},
-                             {"rate_amount": r["rate_amount"], "availability_state": r["availability_state"],
-                              "rooms_remaining": r["rooms_remaining"], "confidence": r["confidence"],
-                              "observed_at": r["observed_at"], "raw_jsonb": r["raw_jsonb"]})
-                    summary["patched"] += 1
-                else:
-                    summary["skipped"] += 1
+                sb.patch("rate_observations", {"id": f"eq.{emap[k]['id']}"},
+                         {"rate_amount": r["rate_amount"], "availability_state": r["availability_state"],
+                          "rooms_remaining": r["rooms_remaining"], "confidence": r["confidence"],
+                          "observed_at": r["observed_at"], "raw_jsonb": r["raw_jsonb"]})
+                summary["patched"] += 1
             else:
                 sb.insert("rate_observations", [r])
                 summary["inserted"] += 1
 
         covered = {r["scraped_property_id"] for r in rows} | {e["scraped_property_id"] for e in existing}
         summary["coverage"] = len(covered)
-        status = "succeeded" if summary["coverage"] >= MIN_COVERAGE else ("degraded" if summary["coverage"] > 0 else "failed")
-        log_run(sb, AGENT, status, {"actor": ACTOR, "days": RATES_DAYS}, summary, started)
+        status = "succeeded" if summary["coverage"] >= MIN_COVERAGE else ("degraded" if summary["coverage"] else "failed")
+        log_run(sb, AGENT, status, {"actor": ACTOR, "days": a.days, "urls": len(start_urls)}, summary, started)
         print(json.dumps({"agent": AGENT, "status": status, **summary}, indent=2))
         return 0 if status != "failed" else 2
     except Exception as e:  # noqa: BLE001
-        log_run(sb, AGENT, "failed", {"actor": ACTOR, "days": RATES_DAYS}, summary, started, error=e)
+        log_run(sb, AGENT, "failed", {"actor": ACTOR}, summary, started, error=e)
         print(json.dumps({"agent": AGENT, "status": "failed", "error": str(e)}))
         return 2
 

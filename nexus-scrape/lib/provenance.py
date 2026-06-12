@@ -6,7 +6,7 @@ migration); mirrored here so dry-runs work offline.
 """
 
 SOURCE_APIFY = "18c5c97c-fcd9-4a2d-b98e-81e37bdc83ed"
-SOURCE_OWM = "47cf612c-525c-4482-8ffa-c8794b977e55"
+SOURCE_WEATHER = "47cf612c-525c-4482-8ffa-c8794b977e55"  # weather slot (Visual Crossing)
 SOURCE_BNR = "e95ad04c-541a-4a27-9384-0719563d7eb8"
 SOURCE_MANUAL = "971746c5-80e7-4ab4-aa28-ffaf748713c3"
 CAT_CLIMATE = "e4b6728a-d5bf-47ee-bd5f-6d063bf60863"
@@ -17,7 +17,7 @@ PROPERTY_TERRA = "9c382e4f-fcad-4590-83ff-1fcce5a2223c"
 
 RATE_PRIOR = 0.85       # Apify/Booking public-page scrape
 OTB_PRIOR = 0.95        # first-party
-WEATHER_PRIOR = 0.90    # OWM licensed API
+WEATHER_PRIOR = 0.90    # Visual Crossing free tier
 FX_CONFIDENCE = 0.99    # official reference rate
 
 # OWM confidence decays with forecast horizon (plan s4).

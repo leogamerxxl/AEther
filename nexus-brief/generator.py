@@ -266,7 +266,7 @@ def build(ctx, today):
                                                       b=round(fnum(t1["value_numeric"])), db=ddmm(rng[-1])))
             lines_en.append(f"Highs {round(fnum(t0['value_numeric']))}-{round(fnum(t1['value_numeric']))}C.")
         b.section("weather", T["weather_t"], lines_ro or [T["weather_none"]],
-                  lines_en or ["No notable signals."], prov_line(wrows, "OpenWeatherMap"), cites)
+                  lines_en or ["No notable signals."], prov_line(wrows, "Visual Crossing"), cites)
 
     # 5 fx
     fx = ctx["fx"]
