@@ -76,6 +76,25 @@ def to_row(norm, prop_id, stay_date, now_iso, raw_item):
     return row
 
 
+def apify_budget_ok(token, floor=None):
+    """Cost circuit-breaker: skip the rate scrape if monthly Apify usage has
+    reached floor x cap, so the free credit is never exceeded. Fail-open on a
+    usage-check error (don't block the brief over a flaky meter)."""
+    if floor is None:
+        floor = float(os.environ.get("APIFY_BUDGET_FLOOR", "0.9"))
+    try:
+        req = urllib.request.Request(
+            f"https://api.apify.com/v2/users/me/limits?token={token}",
+            headers={"User-Agent": "AetherCollector/1.0"})
+        with urllib.request.urlopen(req, timeout=30, context=ssl_context()) as r:
+            d = json.loads(r.read().decode())["data"]
+        usage = float(d.get("current", {}).get("monthlyUsageUsd") or 0)
+        cap = float(d.get("limits", {}).get("maxMonthlyUsageUsd") or 0)
+        return (not (cap and usage >= cap * floor)), usage, cap
+    except Exception:  # noqa: BLE001
+        return True, None, None
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -102,6 +121,13 @@ def main(argv=None):
     except (SBError, KeyError) as e:
         print(json.dumps({"agent": AGENT, "status": "failed", "error": f"missing env: {e}"}))
         return 2
+
+    ok, usage, cap = apify_budget_ok(token)
+    if not ok:
+        log_run(sb, AGENT, "degraded", {"skipped": "apify_budget"}, {"usage_usd": usage, "cap_usd": cap}, started)
+        print(json.dumps({"agent": AGENT, "status": "degraded", "skipped": "apify budget guard",
+                          "usage_usd": usage, "cap_usd": cap}))
+        return 0
 
     try:
         props = sb.select("scraped_properties", select="id,name,booking_url") or []

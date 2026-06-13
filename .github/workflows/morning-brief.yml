@@ -4,9 +4,10 @@ name: AETHER Morning Brief
 # ~80 min before the 07:00 EEST target even if GitHub delays the run. The whole
 # chain (collect -> validate -> brief -> send) runs sequentially in one job,
 # ~5-10 min. Use "Run workflow" (workflow_dispatch) to rehearse on demand.
+# Production runner is the Oracle Cloud VM (docs/ORACLE_VPS_SETUP.md) with
+# systemd timers. This workflow is kept as a MANUAL on-demand fallback only -
+# the daily schedule is disabled so it never double-runs against the VM.
 on:
-  schedule:
-    - cron: '37 2 * * *'
   workflow_dispatch: {}
 
 concurrency:

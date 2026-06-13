@@ -1,0 +1,10 @@
+[Unit]
+Description=AETHER sentinel - verify today's brief was sent, alert if not
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__USER__
+WorkingDirectory=__SCRAPE__
+ExecStart=__SCRAPE__/run.sh sentinel

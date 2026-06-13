@@ -1,0 +1,13 @@
+[Unit]
+Description=AETHER morning brief pipeline (collect -> validate -> brief -> send)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__USER__
+WorkingDirectory=__SCRAPE__
+# fx is best-effort (leading '-' = ignore failure); the morning chain always runs.
+ExecStart=-__SCRAPE__/run.sh fx
+ExecStart=__SCRAPE__/run.sh morning
+TimeoutStartSec=1800

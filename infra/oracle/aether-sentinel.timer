@@ -1,0 +1,9 @@
+[Unit]
+Description=AETHER sentinel - 07:15 Europe/Bucharest daily (dead-man's switch)
+
+[Timer]
+OnCalendar=*-*-* 07:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

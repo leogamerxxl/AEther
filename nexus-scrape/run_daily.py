@@ -81,11 +81,11 @@ def main(argv):
         print(__doc__)
         return 1
     if argv[0] == "morning":
+        rc = 0
         for s in MORNING:
-            if not run_stage(s) and s in ("rates", "validate", "brief"):
-                # core chain broken: stop before sending nonsense; alert already fired
-                return 2
-        return 0
+            if not run_stage(s) and s in ("brief", "send"):
+                rc = 2  # collectors/validate degrade -> honest BLOCK; broken brief/send is hard-fail
+        return rc
     return 0 if run_stage(argv[0]) else 2
 
 
