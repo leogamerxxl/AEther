@@ -1,0 +1,71 @@
+name: AETHER Morning Brief
+
+# Padded for GitHub scheduled-run jitter: fires 02:37 UTC = 05:37 EEST, leaving
+# ~80 min before the 07:00 EEST target even if GitHub delays the run. The whole
+# chain (collect -> validate -> brief -> send) runs sequentially in one job,
+# ~5-10 min. Use "Run workflow" (workflow_dispatch) to rehearse on demand.
+on:
+  schedule:
+    - cron: '37 2 * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: morning-brief
+  cancel-in-progress: false
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    env:
+      PIPELINE_ENABLED: 'true'
+      SUPABASE_URL: https://irmyramqaovmgcktbazy.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+      APIFY_ACTOR: oeiQgfg5fsmIJB7Cn
+      VISUALCROSSING_API_KEY: ${{ secrets.VISUALCROSSING_API_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      BRIEF_FROM: AETHER <onboarding@resend.dev>
+      BRIEF_RECIPIENTS: ${{ secrets.BRIEF_RECIPIENTS }}
+      ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+      ALERT_FROM: onboarding@resend.dev
+      OTB_SHEET_ID: ${{ secrets.OTB_SHEET_ID }}
+      OTB_CAPACITY: '52'
+      RATES_DAYS: '14'
+      MIN_RATE_COVERAGE: '10'
+      BRIEF_TZ_OFFSET_H: '3'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install --quiet certifi google-auth
+      - name: OTB service-account file (optional)
+        env:
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SA_JSON" ]; then
+            printf '%s' "$GOOGLE_SA_JSON" > "$RUNNER_TEMP/sa.json"
+            echo "GOOGLE_SERVICE_ACCOUNT_JSON=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+          fi
+      # Collectors are best-effort: a failure degrades the brief (BLOCK), never
+      # crashes the run. The gate decides honesty; the brief always attempts.
+      - name: FX (BNR)
+        continue-on-error: true
+        run: python nexus-scrape/collectors/bnr_fx.py
+      - name: Competitor rates (Apify)
+        continue-on-error: true
+        run: python nexus-scrape/collectors/booking_rates.py
+      - name: Weather (Visual Crossing)
+        continue-on-error: true
+        run: python nexus-scrape/collectors/weather.py
+      - name: OTB
+        continue-on-error: true
+        run: python nexus-scrape/collectors/otb_sync.py
+      - name: Validate
+        continue-on-error: true
+        run: python nexus-scrape/validate.py
+      - name: Generate brief
+        run: python nexus-brief/generator.py
+      - name: Send brief
+        run: python nexus-mail/send.py
