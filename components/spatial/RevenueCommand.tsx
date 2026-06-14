@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/heroui-card";
 import { LiquidMetalChip } from "@/components/ui/liquid-metal-surface";
 import { Sparkline } from "./charts";
 import { NODES } from "@/lib/spatial-data";
+import IntelligencePanel from "./IntelligencePanel";
 import { deriveRevenueIntel } from "@/lib/revenue-intel";
 import CorridorPressure from "./CorridorPressure";
 import { MetricReadout } from "@/components/command/primitives";
@@ -41,6 +42,7 @@ export default function RevenueCommand({ onOpenMap }: { onOpenMap?: () => void }
         </div>
 
         <div className="grid grid-cols-12 gap-3">
+          <IntelligencePanel />
           {/* PRIMARY ACTION - answers both questions */}
           <Card className="col-span-12 gap-4 p-5 lg:col-span-8">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[.14em] text-cyan-300/70"><Zap className="size-3.5" /> Primary action</div>

@@ -31,6 +31,8 @@ jobs:
         run: npm run typecheck
       - name: Test - deterministic signal engine
         run: npm test
+      - name: Test - spatial intelligence read-model
+        run: npx tsx lib/intelligence-map.test.ts
       - name: Build (next build)
         run: npm run build
 
