@@ -17,7 +17,7 @@ import os
 import json
 import statistics
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -35,6 +35,7 @@ T = {
     "market_t": "Starea pieței",
     "stale_market": "Datele de tarife concurență sunt {state}{when}. Fără date proaspete nu evaluăm piața.",
     "market_line": "Piața (set competitiv, {n} hoteluri): median între {lo} RON ({lo_d}) și {hi} RON ({hi_d}) în următoarele 7 nopți.",
+    "market_no_io": "Stratul de inteligenta de piata este indisponibil - semnalul nu a fost generat de motor.",
     "pressure_t": "Presiunea cererii",
     "pressure_dep": "Indisponibilă — depinde de datele de tarife (vechi).",
     "pressure_hi": "{wd} {d}: {n} hoteluri concurente sunt pline sau aproape pline — presiune RIDICATĂ.",
@@ -105,9 +106,13 @@ def load_data(fixture=None, sb=None):
     if fixture:
         data = json.loads(Path(fixture).read_text(encoding="utf-8"))
         data.setdefault("simulated", True)
+        data.setdefault("intelligence", [])
         return data
     return {"inputs": sb.select("brief_inputs", select="*") or [],
             "status": sb.select("collector_status", select="*") or [],
+            "intelligence": sb.select("intelligence_objects", select="*",
+                                      property_id=f"eq.{pv.PROPERTY_TERRA}",
+                                      status="eq.active", order="observed_at.desc") or [],
             "simulated": False}
 
 
@@ -142,8 +147,18 @@ def index(data):
     for r in by.get("weather", []):
         wx.setdefault(str(r["target_date"]), {})[r["metric"]] = r
     fx = next(iter(by.get("fx", [])), None)
+    # Canonical intelligence layer: the brief RENDERS signals the world model already
+    # contains; it does not re-derive them. Today the engine emits market_rate_pressure.
+    market_ios = {}
+    for io in data.get("intelligence", []):
+        if io.get("signal_type") != "market_rate_pressure":
+            continue
+        sd = (io.get("raw_jsonb") or {}).get("stay_date")
+        if sd:
+            market_ios.setdefault(str(sd), io)  # rows arrive observed_at desc -> keep latest
     return {"rates": rates, "rate_by_date": rate_by_date, "press": press,
             "otb_by_date": otb_by_date, "wx": wx, "fx": fx, "coverage": coverage,
+            "market_ios": market_ios,
             "status": data["status"], "simulated": data.get("simulated", False)}
 
 
@@ -151,6 +166,7 @@ class Brief:
     def __init__(self, today, ctx):
         self.today, self.ctx = today, ctx
         self.sections, self.citations = [], []
+        self.rendered_io_ids = []
         self.gate = gate_verdict(ctx["status"], ctx["coverage"])
 
     def cite(self, claim, rows, computed):
@@ -158,6 +174,14 @@ class Brief:
         self.citations.append({"id": cid, "claim": claim,
                                "observation_ids": sorted({str(r.get("observation_id"))
                                                           for r in rows if r.get("observation_id")}),
+                               "computed": computed})
+        return cid
+
+    def cite_io(self, claim, observation_ids, computed):
+        """Citation sourced from an intelligence_object's evidence chain."""
+        cid = f"c{len(self.citations) + 1}"
+        self.citations.append({"id": cid, "claim": claim,
+                               "observation_ids": sorted({str(o) for o in observation_ids if o}),
                                "computed": computed})
         return cid
 
@@ -180,32 +204,80 @@ def prov_line(rows, source_label):
     return f"{source_label} · {obs[8:10]}.{obs[5:7]} {obs[11:16]}{c} · {state}"
 
 
+def io_freshness(io, now):
+    """Freshness computed at read time (provenance doctrine) from the IO's own
+    observed_at / expires_at - never stored."""
+    def _p(t):
+        return datetime.fromisoformat(str(t).replace("Z", "+00:00"))
+    try:
+        exp = io.get("expires_at")
+        if exp:
+            e = _p(exp)
+            if now <= e:
+                return "fresh"
+            age = (now - e).total_seconds() / 3600
+            return "cooling" if age <= 24 else "stale" if age <= 72 else "dead"
+        obs = io.get("observed_at")
+        if obs:
+            age = (now - _p(obs)).total_seconds() / 3600
+            return "fresh" if age <= 26 else "cooling" if age <= 50 else "stale" if age <= 96 else "dead"
+    except Exception:  # noqa: BLE001
+        return "dead"
+    return "dead"
+
+
+def io_prov_line(ios, source_label, now):
+    """Provenance line for IO-sourced sections: latest observed_at + median
+    confidence + read-time freshness."""
+    if not ios:
+        return None
+    obs = max(str(i["observed_at"]) for i in ios)
+    confs = [fnum(i["confidence"]) for i in ios if i.get("confidence") is not None]
+    state = T.get(io_freshness(ios[0], now), "?")
+    c = f"{T['src_conf']}{round(statistics.median(confs), 2)}" if confs else ""
+    return f"{source_label} · {obs[8:10]}.{obs[5:7]} {obs[11:16]}{c} · {state}"
+
+
 def build(ctx, today):
     b = Brief(today, ctx)
     g = b.gate
     s = {r["agent_code"]: r for r in ctx["status"]}
     rates_dead = g["rates_state"] in ("stale", "dead")
 
-    # 1 market
-    if rates_dead or not ctx["rates"]:
-        last = (s.get("collector.booking_rates") or {}).get("last_observed_at")
-        when = f" (ultimele date: {str(last)[:10]})" if last else ""
-        b.section("market", T["market_t"],
-                  [T["stale_market"].format(state=ro_state(g["rates_state"]), when=when)],
-                  [f"Competitor rate data is {g['rates_state'].upper()}{when}."])
+    # 1 market - rendered from the canonical intelligence layer (market_rate_pressure
+    # IOs), NOT re-derived here. The signal engine computes the medians/coverage; the
+    # brief only renders + cites them. If the world model has no fresh market signal we
+    # degrade honestly. The gate (above) still owns BLOCK.
+    now = utcnow()
+    market_ios = {sd: io for sd, io in ctx["market_ios"].items()
+                  if sd >= today.isoformat() and io_freshness(io, now) in ("fresh", "cooling")}
+    if rates_dead or not market_ios:
+        if rates_dead:
+            last = (s.get("collector.booking_rates") or {}).get("last_observed_at")
+            when = f" (ultimele date: {str(last)[:10]})" if last else ""
+            b.section("market", T["market_t"],
+                      [T["stale_market"].format(state=ro_state(g["rates_state"]), when=when)],
+                      [f"Competitor rate data is {g['rates_state'].upper()}{when}."])
+        else:
+            b.section("market", T["market_t"], [T["market_no_io"]],
+                      ["Market intelligence layer unavailable (signal not generated)."])
     else:
-        d7 = sorted(ctx["rate_by_date"])[:7]
-        meds = {d: round(statistics.median(fnum(r["value_numeric"]) for r in ctx["rate_by_date"][d]))
-                for d in d7}
+        d7 = sorted(market_ios)[:7]
+        ios7 = [market_ios[d] for d in d7]
+        b.rendered_io_ids += [io["id"] for io in ios7 if io.get("id")]
+        meds = {d: round(fnum((market_ios[d].get("raw_jsonb") or {}).get("median_adr_ron"))) for d in d7}
+        cov = max(int((market_ios[d].get("raw_jsonb") or {}).get("coverage", 0)) for d in d7)
         lo_d, hi_d = min(meds, key=meds.get), max(meds, key=meds.get)
-        rows = [r for d in d7 for r in ctx["rate_by_date"][d]]
-        cid = b.cite(f"median piata {ddmm(lo_d)}-{ddmm(hi_d)}", rows, "median(rate)/stay_date, 7d")
+        obs_ids = [oid for d in d7 for ev in (market_ios[d].get("evidence") or [])
+                   for oid in (ev.get("observation_ids") or [])]
+        cid = b.cite_io(f"median piata {ddmm(lo_d)}-{ddmm(hi_d)}", obs_ids,
+                        "intelligence_objects.market_rate_pressure (median/stay_date, 7d)")
         b.section("market", T["market_t"],
-                  [T["market_line"].format(n=ctx["coverage"], lo=meds[lo_d],
+                  [T["market_line"].format(n=cov, lo=meds[lo_d],
                                            lo_d=f"{dow(lo_d)} {ddmm(lo_d)}", hi=meds[hi_d],
                                            hi_d=f"{dow(hi_d)} {ddmm(hi_d)}")],
-                  [f"Market median {meds[lo_d]}-{meds[hi_d]} RON, next 7 nights ({ctx['coverage']} hotels)."],
-                  prov_line(rows, "Booking.com via Apify"), [cid])
+                  [f"Market median {meds[lo_d]}-{meds[hi_d]} RON, next 7 nights ({cov} hotels)."],
+                  io_prov_line(ios7, "AETHER signal engine (Booking via Apify)", now), [cid])
 
     # 2 pressure
     pressed = {d: v for d, v in ctx["press"].items() if len(v) >= 3}
@@ -422,6 +494,7 @@ def write_db(sb, b, text, html_out, force=False):
     today = b.today.isoformat()
     content = {"subject": subject(b), "verdict": b.gate, "sections": b.sections,
                "citations": b.citations, "simulated": b.ctx["simulated"], "text": text,
+               "intelligence_object_ids": b.rendered_io_ids,
                "data_window": {r["agent_code"]: r.get("last_observed_at") for r in b.ctx["status"]}}
     existing = sb.select("daily_briefs", select="id,sent_at",
                          property_id=f"eq.{pv.PROPERTY_TERRA}", brief_date=f"eq.{today}", limit=1)
