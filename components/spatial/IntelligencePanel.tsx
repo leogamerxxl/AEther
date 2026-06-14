@@ -6,6 +6,7 @@
 // neutral idle = sample - never harbor amber, which is reserved for money/action).
 // No intelligence and no color literals are introduced here.
 
+import { useState } from "react";
 import { Card } from "@/components/ui/heroui-card";
 import { C, confidenceColor } from "@/lib/command-theme";
 import { useSpatialIntelligence } from "@/lib/intelligence";
@@ -15,6 +16,7 @@ import {
   type Freshness,
   type IntelligenceObject,
 } from "@/lib/intelligence-map";
+import IOContextDrawer from "./IOContextDrawer";
 
 // IO severity -> command-theme accent (signal cools / warms by role; no literals).
 function severityColor(sev: IntelligenceObject["severity"]): string {
@@ -35,8 +37,10 @@ const FRESH_COLOR: Record<Freshness, string> = {
 export default function IntelligencePanel() {
   const { source, objects } = useSpatialIntelligence();
   const live = source === "live";
+  const [selected, setSelected] = useState<IntelligenceObject | null>(null);
 
   return (
+    <>
     <Card className="col-span-12 gap-3 p-5">
       <div className="flex items-center justify-between">
         <div className="text-[10px] font-semibold uppercase tracking-[.14em] text-white/45">
@@ -74,7 +78,8 @@ export default function IntelligencePanel() {
             const pct = Math.round(io.confidence * 100);
             const recs = io.recommended_actions?.length ?? 0;
             return (
-              <li key={io.id} className="rounded-[10px] border border-white/[.06] bg-white/[.02] px-3 py-2.5">
+              <li key={io.id}>
+                <button type="button" onClick={() => setSelected(io)} className="w-full rounded-[10px] border border-white/[.06] bg-white/[.02] px-3 py-2.5 text-left transition-colors hover:bg-white/[.04]">
                 <div className="flex items-center gap-2">
                   <span className="size-1.5 shrink-0 rounded-full" style={{ background: sev, boxShadow: `0 0 6px ${sev}` }} />
                   <span className="text-[14px] font-semibold text-white">{io.signal_type}</span>
@@ -98,11 +103,14 @@ export default function IntelligencePanel() {
                   </span>
                   {io.visual_anchor?.label ? <span className="ml-auto">{io.visual_anchor.label}</span> : null}
                 </div>
+                </button>
               </li>
             );
           })}
         </ul>
       )}
     </Card>
+    <IOContextDrawer io={selected} onClose={() => setSelected(null)} />
+    </>
   );
 }
