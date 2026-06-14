@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/heroui-card";
 import { C, confidenceColor } from "@/lib/command-theme";
-import { useSpatialIntelligence } from "@/lib/intelligence";
+import { useIntelligence } from "./SpatialIntelligenceProvider";
 import {
   ioFreshness,
   evidenceCount,
@@ -35,7 +35,7 @@ const FRESH_COLOR: Record<Freshness, string> = {
 };
 
 export default function IntelligencePanel() {
-  const { source, objects } = useSpatialIntelligence();
+  const { source, objects } = useIntelligence();
   const live = source === "live";
   const [selected, setSelected] = useState<IntelligenceObject | null>(null);
 

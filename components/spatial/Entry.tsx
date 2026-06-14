@@ -10,6 +10,7 @@ import CoastalCommandCenter from "./CoastalCommandCenter";
 import StaffFeed from "./StaffFeed";
 import RevenueCommand from "./RevenueCommand";
 import OperationsCommand from "./OperationsCommand";
+import { SpatialIntelligenceProvider } from "./intelligence/SpatialIntelligenceProvider";
 import AuthGate from "./AuthGate";
 import { Toaster } from "./Toast";
 import { toast } from "@/lib/toast";
@@ -79,6 +80,7 @@ export default function Entry() {
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-black">
+    <SpatialIntelligenceProvider>
       {hydrated && isStaff ? (
         <StaffFeed role={role!} />
       ) : hydrated && session && appView === "revenue" ? (
@@ -139,6 +141,7 @@ export default function Entry() {
       {!splashGone ? (
         <EntranceSplash onReveal={() => setRevealed(true)} onDone={() => setSplashGone(true)} />
       ) : null}
+    </SpatialIntelligenceProvider>
     </div>
   );
 }

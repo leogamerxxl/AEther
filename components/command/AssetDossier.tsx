@@ -9,14 +9,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, MapPin, Swords } from "lucide-react";
 import { CommandPanel, IntelCard, MetricReadout, Delta } from "@/components/command/primitives";
 import { HotelLineArt } from "@/components/command/illustrations";
-import { NODES } from "@/lib/spatial-data";
+import { useIntelligence } from "@/components/spatial/intelligence/SpatialIntelligenceProvider";
+import type { PropertyIntelligenceNode } from "@/types/spatial";
 import { deriveIntel } from "@/lib/spatial-intel";
 import { paceColor } from "@/lib/property-extrusions";
 import { weeklyForecast } from "@/lib/asset-forecast";
 import { C, ron } from "@/lib/command-theme";
 
 export function AssetDossier({ nodeId, onClose, onLocate }: { nodeId: string | null; onClose: () => void; onLocate?: (id: string) => void }) {
-  const node = nodeId ? NODES.find((n) => n.id === nodeId) ?? null : null;
+  const { nodes } = useIntelligence();
+  const node = nodeId ? nodes.find((n) => n.id === nodeId) ?? null : null;
 
   useEffect(() => {
     if (!node) return;
@@ -37,7 +39,7 @@ export function AssetDossier({ nodeId, onClose, onLocate }: { nodeId: string | n
   );
 }
 
-function DossierBody({ node, onClose, onLocate }: { node: NonNullable<ReturnType<typeof NODES.find>>; onClose: () => void; onLocate?: (id: string) => void }) {
+function DossierBody({ node, onClose, onLocate }: { node: PropertyIntelligenceNode; onClose: () => void; onLocate?: (id: string) => void }) {
   const i = deriveIntel(node);
   const accent = paceColor(node);
   const occ = i.occupancy, adr = i.adr, revpar = i.revparEst;

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 // AssetGallery - a horizontal scroll-snapping rail of glass AssetCards built
 // from the real property set. Hover-to-illuminate (only the hovered card stays
@@ -8,7 +8,7 @@ import { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AssetCard } from "./AssetCard";
 import { AssetDossier } from "./AssetDossier";
-import { NODES } from "@/lib/spatial-data";
+import { useIntelligence } from "@/components/spatial/intelligence/SpatialIntelligenceProvider";
 import { deriveIntel } from "@/lib/spatial-intel";
 import { paceColor } from "@/lib/property-extrusions";
 import { weeklyForecast } from "@/lib/asset-forecast";
@@ -20,6 +20,7 @@ function codeFor(id: string): string {
 }
 
 export function AssetGallery({ onLocate }: { onLocate?: (id: string) => void }) {
+  const { nodes } = useIntelligence();
   const ref = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -29,7 +30,7 @@ export function AssetGallery({ onLocate }: { onLocate?: (id: string) => void }) 
     <>
       <div className="relative">
         <div ref={ref} className="snap-x no-scrollbar flex gap-4 overflow-x-auto px-1 pb-3 pt-1">
-          {NODES.map((n) => {
+          {nodes.map((n) => {
             const i = deriveIntel(n);
             const accent = paceColor(n);
             return (

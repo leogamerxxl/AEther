@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import { Map, BedDouble, UtensilsCrossed, ChefHat, Wine, Camera, Users, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/heroui-card";
-import { NODES } from "@/lib/spatial-data";
+import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
 import { ZONE_STATE, FLAGS, SEV_COLOR, ROLES, type ZoneId } from "@/lib/ops";
 import type { LucideIcon } from "lucide-react";
 
@@ -31,7 +31,8 @@ function ZoneCard({ zone, label, icon: Icon, span }: { zone: ZoneId; label: stri
 }
 
 export default function OperationsCommand({ onOpenMap }: { onOpenMap?: () => void }) {
-  const home = NODES.find((n) => n.isOwn) ?? NODES[0];
+  const { nodes } = useIntelligence();
+  const home = nodes.find((n) => n.isOwn) ?? nodes[0];
   const totalStaff = Object.values(ZONE_STATE).reduce((a, z) => a + z.staffOnShift, 0);
   const staffZones: { zone: ZoneId; label: string }[] = [
     { zone: "rooms", label: "Housekeeping" }, { zone: "restaurant", label: "Restaurant" }, { zone: "kitchen", label: "Kitchen" },

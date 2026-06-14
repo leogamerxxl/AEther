@@ -4,8 +4,8 @@ import { Map, ArrowRight, ArrowUp, ArrowDown, TrendingUp, Gauge, Search, CloudLi
 import { Card } from "@/components/ui/heroui-card";
 import { LiquidMetalChip } from "@/components/ui/liquid-metal-surface";
 import { Sparkline } from "./charts";
-import { NODES } from "@/lib/spatial-data";
-import IntelligencePanel from "./IntelligencePanel";
+import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
+import IntelligencePanel from "./intelligence/IntelligencePanel";
 import { deriveRevenueIntel } from "@/lib/revenue-intel";
 import CorridorPressure from "./CorridorPressure";
 import { MetricReadout } from "@/components/command/primitives";
@@ -20,7 +20,8 @@ function Delta({ v, suffix = "%" }: { v: number; suffix?: string }) {
 }
 
 export default function RevenueCommand({ onOpenMap }: { onOpenMap?: () => void }) {
-  const home = NODES.find((n) => n.isOwn) ?? NODES[0];
+  const { nodes } = useIntelligence();
+  const home = nodes.find((n) => n.isOwn) ?? nodes[0];
   const r = deriveRevenueIntel(home);
   const occSpark = r.trajectory.map((v) => Math.round(Math.min(99, Math.max(40, v / 8 + r.occupancy - 12))));
   const revparSpark = r.trajectory.map((v) => Math.round((v * r.occupancy) / 100));
