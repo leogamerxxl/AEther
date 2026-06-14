@@ -68,6 +68,14 @@ class SB:
     def patch(self, table, params, body):
         return self._req("PATCH", table, params=params, body=body, prefer="return=minimal")
 
+    def upsert(self, table, rows, on_conflict):
+        """Idempotent write: ON CONFLICT (<on_conflict>) DO UPDATE. The signal
+        engine uses this so a re-run rewrites a signal instead of accumulating."""
+        if not rows:
+            return None
+        return self._req("POST", table, params={"on_conflict": on_conflict},
+                         body=rows, prefer="resolution=merge-duplicates,return=minimal")
+
 
 def utcnow():
     return datetime.now(timezone.utc)

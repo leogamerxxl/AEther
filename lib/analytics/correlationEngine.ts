@@ -141,7 +141,7 @@ function computeSentimentPressure(
   velocity: number = 0
 ): { pressure: number; severity: RiskFactor['severity']; label: string } {
   // Conversia scorului (-1…+1) în presiune (0…1)
-  let basePressure = clamp01((1 - score) / 2);
+  const basePressure = clamp01((1 - score) / 2);
 
   // Amplificator dacă sentimentul se deteriorează rapid
   const velocityPenalty = velocity < -0.15 ? 0.10 : velocity < -0.05 ? 0.05 : 0;

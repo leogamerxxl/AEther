@@ -3,8 +3,8 @@
 Stages (EEST schedule -> UTC cron): fx 14:30 (11:30Z prev-day) | rates 04:30
 (01:30Z) | weather 04:45 (01:45Z) | otb 05:00 (02:00Z) | validate 05:30 (02:30Z)
 | brief 06:00 (03:00Z) | send 06:45 (03:45Z) | sentinel 06:55 (03:55Z).
-Usage: python run_daily.py <fx|rates|weather|otb|validate|brief|send|sentinel|morning>
-  morning = rates -> weather -> otb -> validate -> brief -> send
+Usage: python run_daily.py <fx|rates|weather|otb|validate|signals|brief|send|sentinel|morning>
+  morning = rates -> weather -> otb -> validate -> signals -> brief -> send
 """
 import json
 import os
@@ -27,11 +27,12 @@ STAGES = {
     "weather":  [PY, str(HERE / "collectors" / "weather.py")],
     "otb":      [PY, str(HERE / "collectors" / "otb_sync.py")],
     "validate": [PY, str(HERE / "validate.py")],
+    "signals":  [PY, str(HERE / "signal_engine.py")],
     "brief":    [PY, str(ROOT / "nexus-brief" / "generator.py")],
     "send":     [PY, str(ROOT / "nexus-mail" / "send.py")],
     "sentinel": [PY, str(ROOT / "nexus-mail" / "send.py"), "--sentinel"],
 }
-MORNING = ["rates", "weather", "otb", "validate", "brief", "send"]
+MORNING = ["rates", "weather", "otb", "validate", "signals", "brief", "send"]
 RETRIES = int(os.environ.get("STAGE_RETRIES", "2"))
 BACKOFF_S = int(os.environ.get("RETRY_BACKOFF_S", "60"))
 

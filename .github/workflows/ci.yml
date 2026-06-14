@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: web - typecheck - test - build
+    runs-on: ubuntu-latest
+    env:
+      # Build-time only. Real values are injected by the host (Vercel) at deploy.
+      # These placeholders just let `next build` compile - no secret, no live data.
+      NEXT_PUBLIC_SUPABASE_URL: https://irmyramqaovmgcktbazy.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_placeholder_build_only
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+      - name: Test - deterministic signal engine
+        run: npm test
+      - name: Build (next build)
+        run: npm run build
+
+  lint:
+    # Non-blocking for now: known react-hooks/refs issues are tracked for
+    # burndown. Surfaces the count on every PR without gating merges.
+    name: lint - non-blocking debt
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  python:
+    name: python - byte-compile pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Byte-compile collectors + brief + mail
+        run: |
+          python -m py_compile \
+            nexus-scrape/collectors/*.py \
+            nexus-scrape/lib/*.py \
+            nexus-scrape/*.py \
+            nexus-brief/*.py \
+            nexus-mail/*.py
+      - name: Signal-engine unit tests (pure, no secrets)
+        run: python nexus-scrape/test_signal_engine.py
