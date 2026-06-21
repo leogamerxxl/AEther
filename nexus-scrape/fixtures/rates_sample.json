@@ -1,0 +1,18 @@
+[
+  {"id":"f-0101-01","scraped_property_id":"p01","stay_date":"2026-07-01","rate_amount":540,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":4,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-02","scraped_property_id":"p02","stay_date":"2026-07-01","rate_amount":498,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":2,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-03","scraped_property_id":"p03","stay_date":"2026-07-01","rate_amount":612,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":1,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-04","scraped_property_id":"p04","stay_date":"2026-07-01","rate_amount":455,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":6,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-05","scraped_property_id":"p05","stay_date":"2026-07-01","rate_amount":389,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":8,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-06","scraped_property_id":"p06","stay_date":"2026-07-01","rate_amount":99,"currency_code":"EUR","room_type":"double","availability_state":"available","rooms_remaining":3,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-07","scraped_property_id":"p07","stay_date":"2026-07-01","rate_amount":527,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":2,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-08","scraped_property_id":"p08","stay_date":"2026-07-01","rate_amount":468,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":5,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-09","scraped_property_id":"p09","stay_date":"2026-07-01","rate_amount":503,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":4,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-10","scraped_property_id":"p10","stay_date":"2026-07-01","rate_amount":441,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":7,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-11","scraped_property_id":"p11","stay_date":"2026-07-01","rate_amount":585,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":1,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0101-12","scraped_property_id":"p12","stay_date":"2026-07-01","rate_amount":472,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":3,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0102-01","scraped_property_id":"p01","stay_date":"2026-07-02","rate_amount":410,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":5,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0102-02","scraped_property_id":"p02","stay_date":"2026-07-02","rate_amount":462,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":4,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0102-03","scraped_property_id":"p03","stay_date":"2026-07-02","rate_amount":538,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":2,"observed_at":"2026-07-01T03:00:00+00:00"},
+  {"id":"f-0102-04","scraped_property_id":"p04","stay_date":"2026-07-02","rate_amount":447,"currency_code":"RON","room_type":"double","availability_state":"available","rooms_remaining":6,"observed_at":"2026-07-01T03:00:00+00:00"}
+]

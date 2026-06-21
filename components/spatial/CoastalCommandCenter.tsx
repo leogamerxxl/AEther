@@ -16,11 +16,11 @@
  *   • Supabase Realtime subscription for live telemetry updates
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { NODES } from "@/lib/spatial-data";
+import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
 import { deriveIntel } from "@/lib/spatial-intel";
 import type { PropertyIntelligenceNode } from "@/types/spatial";
 import { HoverChip, PinPopup } from "./MapCards";
@@ -35,7 +35,6 @@ mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const CENTER: [number, number] = [28.596282, 43.869390];
-const HOME = NODES.find(n => n.name === "Hotel Terra Neptun") ?? NODES[0];
 
 // ─── CoastalCommandCenter ────────────────────────────────────────────────────
 
@@ -47,6 +46,14 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
   const bootedRef    = useRef(false);
   const lockedRef    = useRef(locked);
   lockedRef.current  = locked;
+
+  // Single read layer: nodes (sample scaffold overlaid with live IO insight) come
+  // from the one provider - never a direct NODES import. A ref keeps map event
+  // handlers (bound once) resolving against the latest live nodes.
+  const { nodes, source } = useIntelligence();
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+  const HOME = useMemo(() => nodes.find(n => n.name === "Hotel Terra Neptun") ?? nodes[0], [nodes]);
 
   const [hoveredId,  setHoveredId]  = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -199,7 +206,7 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
 
     const onClick = (e: mapboxgl.MapLayerMouseEvent) => {
       const id = e.features?.[0]?.properties?.id as string | undefined;
-      const node = id ? NODES.find(n => n.id === id) : null;
+      const node = id ? nodesRef.current.find(n => n.id === id) : null;
       if (node) { e.originalEvent.stopPropagation(); select(node); }
     };
     const onEnter = () => { map.getCanvas().style.cursor = "pointer"; };
@@ -295,12 +302,12 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
   // ── Derived render state ──────────────────────────────────────────────────
   const map      = mapRef.current;
   const project  = (n: PropertyIntelligenceNode) => map && ready ? map.project(n.coordinates) : null;
-  const hovered  = hoveredId  ? NODES.find(n => n.id === hoveredId)  ?? null : null;
-  const selected = selectedId ? NODES.find(n => n.id === selectedId) ?? null : null;
+  const hovered  = hoveredId  ? nodes.find(n => n.id === hoveredId)  ?? null : null;
+  const selected = selectedId ? nodes.find(n => n.id === selectedId) ?? null : null;
   const hp       = hovered && hovered.id !== selectedId ? project(hovered) : null;
   const sp       = selected && !expanded ? project(selected) : null;
   const oodaMode = selected ? (live[selected.id] ? "LIVE" : "ORIENT") : "OBSERVE";
-  const nodeCount = NODES.length;
+  const nodeCount = nodes.length;
 
   // ── Action handler ────────────────────────────────────────────────────────
   const onAction = (label: string) => {
@@ -412,7 +419,7 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
           </span>
           <span className="h-2 w-px bg-white/[.08]" />
           <span className="font-mono text-[9px] text-slate-600">
-            Real ADR · Sample telemetry
+            {source === "live" ? "Live market intelligence" : "Real ADR · Sample telemetry"}
           </span>
         </div>
 

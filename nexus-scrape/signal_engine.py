@@ -132,8 +132,22 @@ def main():
     ap.add_argument("--horizon", type=int, default=HORIZON_DEFAULT)
     ap.add_argument("--fresh-window-h", type=int, default=FRESH_WINDOW_H)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--fixture", type=str, default=None,
+                    help="run build_objects against a JSON file of rate rows (no DB, no secrets)")
     args = ap.parse_args()
     started = utcnow()
+
+    if args.fixture:
+        rows = json.loads(Path(args.fixture).read_text(encoding="utf-8"))
+        fx = float(os.environ.get("FIXTURE_FX_EUR_RON", "5.0"))
+        now_iso, expires_iso = iso(utcnow()), iso(utcnow() + timedelta(hours=24))
+        objs = build_objects(rows, fx, now_iso, expires_iso)
+        print(json.dumps({
+            "fixture": args.fixture, "rate_rows": len(rows), "objects": len(objs),
+            "stay_dates": [o["dedupe_key"].split(":", 1)[1] for o in objs],
+            "coverage": {o["dedupe_key"].split(":", 1)[1]: o["raw_jsonb"]["coverage"] for o in objs},
+        }, default=str, indent=2))
+        return 0
 
     try:
         sb = SB()

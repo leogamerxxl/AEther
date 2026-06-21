@@ -17,6 +17,7 @@ concurrency:
 jobs:
   brief:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       PIPELINE_ENABLED: 'true'
       SUPABASE_URL: https://irmyramqaovmgcktbazy.supabase.co
@@ -41,6 +42,9 @@ jobs:
           python-version: '3.11'
       - name: Install deps
         run: pip install --quiet certifi google-auth
+      # Fail fast on missing DB secrets - never burn a run or send an empty brief.
+      - name: Preflight (required secrets present)
+        run: python nexus-scrape/preflight.py
       - name: OTB service-account file (optional)
         env:
           GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}

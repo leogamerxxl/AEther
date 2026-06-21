@@ -55,8 +55,23 @@ def test_grouping_and_threshold():
     print("  ok grouping + severity threshold (11 -> low, 1 -> info)")
 
 
+def test_fixture_file():
+    import json as _json
+    p = Path(__file__).resolve().parent / "fixtures" / "rates_sample.json"
+    rows = _json.loads(p.read_text(encoding="utf-8"))
+    objs = build_objects(rows, fx=5.0, now_iso="N", expires_iso="E")
+    by = {o["dedupe_key"]: o for o in objs}
+    full = by["market_rate_pressure:2026-07-01"]
+    assert full["raw_jsonb"]["coverage"] == 12        # 11 RON + 1 EUR converted
+    assert full["severity"] == "low"                  # full coverage -> graded
+    thin = by["market_rate_pressure:2026-07-02"]
+    assert thin["severity"] == "info"                 # 4 < MIN_COVERAGE
+    assert thin["recommended_actions"] == []          # Truth Doctrine on thin data
+    print(f"  ok fixture file: {len(objs)} objects, 07-01 cov={full['raw_jsonb']['coverage']}")
+
+
 def run():
-    tests = [test_currency, test_thin_coverage_no_recommendation, test_grouping_and_threshold]
+    tests = [test_currency, test_thin_coverage_no_recommendation, test_grouping_and_threshold, test_fixture_file]
     failed = 0
     for t in tests:
         try:
