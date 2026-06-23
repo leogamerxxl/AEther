@@ -29,11 +29,12 @@ STAGES = {
     "validate": [PY, str(HERE / "validate.py")],
     "signals":  [PY, str(HERE / "signal_engine.py")],
     "signals_weather": [PY, str(HERE / "signal_weather.py")],
+    "ontology": [PY, str(HERE / "ontology_sync.py")],
     "brief":    [PY, str(ROOT / "nexus-brief" / "generator.py")],
     "send":     [PY, str(ROOT / "nexus-mail" / "send.py")],
     "sentinel": [PY, str(ROOT / "nexus-mail" / "send.py"), "--sentinel"],
 }
-MORNING = ["rates", "weather", "otb", "validate", "signals", "signals_weather", "brief", "send"]
+MORNING = ["rates", "weather", "otb", "validate", "signals", "signals_weather", "ontology", "brief", "send"]
 RETRIES = int(os.environ.get("STAGE_RETRIES", "2"))
 BACKOFF_S = int(os.environ.get("RETRY_BACKOFF_S", "60"))
 
