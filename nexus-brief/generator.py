@@ -49,6 +49,8 @@ T = {
     "weather_wknd": "Weekend favorabil plajei ({ds}) — așteptați cerere de ultim moment.",
     "weather_range": "Maxime între {a}°C ({da}) și {b}°C ({db}).",
     "weather_none": "Fără semnale meteo notabile.",
+    "outlook_t": "Perspectiva cererii (meteo)",
+    "outlook_line": "{fav}/7 zile favorabile plajei {ws}-{we}; maxime {a}-{b}°C — cerere de weekend probabilă.",
     "fx_t": "Curs valutar",
     "fx_line": "EUR/RON: {v} (BNR, {d}). Relevant pentru oaspeții din zona euro.",
     "fx_none": "Curs BNR indisponibil astăzi.",
@@ -156,9 +158,11 @@ def index(data):
         sd = (io.get("raw_jsonb") or {}).get("stay_date")
         if sd:
             market_ios.setdefault(str(sd), io)  # rows arrive observed_at desc -> keep latest
+    weather_ios = [io for io in data.get("intelligence", [])
+                   if io.get("signal_type") == "weather_demand_outlook"]
     return {"rates": rates, "rate_by_date": rate_by_date, "press": press,
             "otb_by_date": otb_by_date, "wx": wx, "fx": fx, "coverage": coverage,
-            "market_ios": market_ios,
+            "market_ios": market_ios, "weather_ios": weather_ios,
             "status": data["status"], "simulated": data.get("simulated", False)}
 
 
@@ -339,6 +343,23 @@ def build(ctx, today):
             lines_en.append(f"Highs {round(fnum(t0['value_numeric']))}-{round(fnum(t1['value_numeric']))}C.")
         b.section("weather", T["weather_t"], lines_ro or [T["weather_none"]],
                   lines_en or ["No notable signals."], prov_line(wrows, "Visual Crossing"), cites)
+
+    # 4b demand outlook - rendered from the canonical weather_demand_outlook IO (the
+    # same object the spatial map shows). The brief RENDERS the world model here too.
+    wios = [io for io in ctx.get("weather_ios", []) if io_freshness(io, now) in ("fresh", "cooling")]
+    if wios:
+        wio = wios[0]
+        raw = wio.get("raw_jsonb") or {}
+        obs_ids = [oid for ev in (wio.get("evidence") or []) for oid in (ev.get("observation_ids") or [])]
+        b.rendered_io_ids.append(wio["id"])
+        cid = b.cite_io(f"outlook meteo {ddmm(raw.get('window_start'))}-{ddmm(raw.get('window_end'))}",
+                        obs_ids, "intelligence_objects.weather_demand_outlook (favorable days, 7d)")
+        b.section("demand_outlook", T["outlook_t"],
+                  [T["outlook_line"].format(fav=raw.get("favorable_days"),
+                                            ws=ddmm(raw.get("window_start")), we=ddmm(raw.get("window_end")),
+                                            a=raw.get("tmax_min_c"), b=raw.get("tmax_max_c"))],
+                  [f"Beach-favorable days {raw.get('favorable_days')}/7."],
+                  io_prov_line([wio], "AETHER signal engine (Visual Crossing)", now), [cid])
 
     # 5 fx
     fx = ctx["fx"]

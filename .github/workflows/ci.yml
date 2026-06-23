@@ -69,5 +69,7 @@ jobs:
             nexus-mail/*.py
       - name: Signal-engine unit tests (pure, no secrets)
         run: python nexus-scrape/test_signal_engine.py
+      - name: Weather-signal unit tests (pure, no secrets)
+        run: python nexus-scrape/test_signal_weather.py
       - name: Brief reads-IO tests (pure, no secrets)
         run: python nexus-brief/test_brief_reads_io.py
