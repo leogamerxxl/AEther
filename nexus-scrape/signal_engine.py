@@ -73,7 +73,9 @@ def build_objects(latest_rows, fx, now_iso, expires_iso):
     by_date = {}
     for r in latest_rows:
         ron = _to_ron(r.get("rate_amount"), r.get("currency_code"), fx)
-        if ron is None:
+        # sold-out / unpriced comps are stored as rate_amount=0; exclude them from
+        # the ADR median so the market signal reflects only bookable prices.
+        if ron is None or ron <= 0:
             continue
         by_date.setdefault(r["stay_date"], []).append((ron, r))
 

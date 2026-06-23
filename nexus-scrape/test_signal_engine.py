@@ -43,6 +43,17 @@ def test_thin_coverage_no_recommendation():
           f"conf={o['confidence']} sev={o['severity']}")
 
 
+def test_soldout_excluded_from_median():
+    rows = [_rate("p1", "2026-06-20", 400), _rate("p2", "2026-06-20", 500),
+            _rate("p3", "2026-06-20", 0), _rate("p4", "2026-06-20", 0)]  # 2 sold-out
+    objs = build_objects(rows, fx=5.0, now_iso="N", expires_iso="E")
+    o = objs[0]
+    assert o["raw_jsonb"]["median_adr_ron"] == 450.0   # median of 400,500 only
+    assert o["raw_jsonb"]["coverage"] == 2             # zero-priced excluded
+    assert len(o["evidence"][0]["observation_ids"]) == 2
+    print(f"  ok sold-out excluded: median={o['raw_jsonb']['median_adr_ron']} cov={o['raw_jsonb']['coverage']}")
+
+
 def test_grouping_and_threshold():
     rows = [_rate(f"p{i}", "2026-06-21", 400 + i * 10) for i in range(11)]
     rows.append(_rate("p0", "2026-06-22", 300))
@@ -71,7 +82,7 @@ def test_fixture_file():
 
 
 def run():
-    tests = [test_currency, test_thin_coverage_no_recommendation, test_grouping_and_threshold, test_fixture_file]
+    tests = [test_currency, test_thin_coverage_no_recommendation, test_soldout_excluded_from_median, test_grouping_and_threshold, test_fixture_file]
     failed = 0
     for t in tests:
         try:
