@@ -26,3 +26,15 @@
 - [ ] Savoy Hotel Mamaia booking_url (12th comp) + scraped_properties metadata cleanup
       (task_3e739f14: Nayino/Zenith/Mera city+coords).
 - [ ] CoastalCommandCenter internals modernization (post-NIGHT-HARBOR pass beyond legend fix).
+## Vision roadmap (owner brief 2026-07-03 — post-streak, in order of dependency)
+- [ ] OODA loop closure: observe→orient (IOs) exists; decide (io_actions) shipping; ACT
+      (rate-change execution path) and outcome VALIDATES computation = the loop's back half.
+- [ ] Predictive layer: booking-pace forecast per stay-date once >=30 days of daily scrape
+      history exists (the streak builds the training data; nothing to predict before it).
+- [ ] Macro/micro sync: BNR FX + macro_observations already flow; add CEE macro calendar,
+      holiday/event ingestion, local demand proxies (Google Trends) as registry collectors.
+- [ ] Sensors/logistics (energy production/consumption, occupancy sensors): vertical_profiles-
+      gated collector registry — same IO envelope, property/department altitude.
+- [ ] Global/local sync: market→coast→country rollup views over ontology graph edges.
+Design north star: UXP Smart City Platform (behance.net/gallery/202149327) — density + map-
+first ops feel, executed strictly under NIGHT HARBOR tokens (two-temperature discipline).
