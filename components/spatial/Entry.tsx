@@ -8,11 +8,10 @@ import { getSession, signOut, type Session } from "@/lib/auth";
 import { ROLES } from "@/lib/ops";
 import CoastalCommandCenter from "./CoastalCommandCenter";
 import StaffFeed from "./StaffFeed";
-import RevenueCommand from "./RevenueCommand";
-import OperationsCommand from "./OperationsCommand";
 import { SpatialIntelligenceProvider } from "./intelligence/SpatialIntelligenceProvider";
 import CommandRail from "./intelligence/CommandRail";
 import AltitudeLadder from "./intelligence/AltitudeLadder";
+import WorldChrome from "./intelligence/WorldChrome";
 import { bandForZoom } from "@/lib/altitude";
 import AuthGate from "./AuthGate";
 import { Toaster } from "./Toast";
@@ -33,7 +32,7 @@ export default function Entry() {
   const [authOpen, setAuthOpen] = useState(false);
   const [ctaShown, setCtaShown] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [appView, setAppView] = useState<"map" | "revenue" | "operations">("map");
+  const [focusId, setFocusId] = useState<string | null>(null);
   const [settings, setSettings] = useState<{ open: boolean; section: SettingsSection }>({ open: false, section: "profile" });
   const [zoom, setZoom] = useState(14.2);
   const flyRef = useRef<((zoom: number) => void) | null>(null);
@@ -41,7 +40,12 @@ export default function Entry() {
   const flyTo = (z: number) => flyRef.current?.(z);
   const openSettings = (section: SettingsSection) => setSettings({ open: true, section });
 
-  useEffect(() => { setSession(getSession()); setHydrated(true); }, []);
+  useEffect(() => {
+    const s = getSession();
+    setSession(s); setHydrated(true);
+    // Returning session: zero theater at 7am - world appears immediately.
+    if (s) { setSplashGone(true); setRevealed(true); }
+  }, []);
   useEffect(() => { applyReduceMotion(loadPrefs().reduceMotion); }, []);
 
   useEffect(() => {
@@ -90,28 +94,17 @@ export default function Entry() {
     <SpatialIntelligenceProvider>
       {hydrated && isStaff ? (
         <StaffFeed role={role!} />
-      ) : hydrated && session && appView === "revenue" ? (
-        <RevenueCommand onOpenMap={() => setAppView("map")} />
-      ) : hydrated && session && appView === "operations" ? (
-        <OperationsCommand onOpenMap={() => setAppView("map")} />
       ) : (
-        <CoastalCommandCenter cinematic start={revealed} locked={!session} onCamera={setZoom} registerFlyTo={(fn) => { flyRef.current = fn; }} />
+        <CoastalCommandCenter cinematic start={revealed} locked={!session} onCamera={setZoom} registerFlyTo={(fn) => { flyRef.current = fn; }} onFocus={setFocusId} />
       )}
 
       {/* The map's operating rail - authenticated command surface (desktop) */}
-      {hydrated && session && !isStaff && appView === "map" ? (
-        <>
-          <CommandRail band={band} onFlyTo={flyTo} />
-          <AltitudeLadder band={band} onFlyTo={flyTo} />
-        </>
-      ) : null}
-
       {hydrated && session && !isStaff ? (
-        <div className="gx gx-bento fixed left-1/2 top-4 z-[82] flex -translate-x-1/2 items-center gap-1 rounded-full p-1">
-          <button onClick={() => setAppView("map")} className={"cursor-pointer rounded-full px-4 py-1.5 text-[12px] font-medium transition-colors " + (appView === "map" ? "gx-metal" : "text-white/55 hover:text-white")}>Map</button>
-          <button onClick={() => setAppView("revenue")} className={"cursor-pointer rounded-full px-4 py-1.5 text-[12px] font-medium transition-colors " + (appView === "revenue" ? "gx-metal" : "text-white/55 hover:text-white")}>Revenue</button>
-          <button onClick={() => setAppView("operations")} className={"cursor-pointer rounded-full px-4 py-1.5 text-[12px] font-medium transition-colors " + (appView === "operations" ? "gx-metal" : "text-white/55 hover:text-white")}>Operations</button>
-        </div>
+        <>
+          <CommandRail band={band} onFlyTo={flyTo} focusId={focusId} />
+          <AltitudeLadder band={band} onFlyTo={flyTo} />
+          <WorldChrome band={band} />
+        </>
       ) : null}
 
       {/* Owner/Manager: the Aether logo menu replaces the old status bar (top-left) */}

@@ -45,8 +45,11 @@ function Card({ children }: { children: React.ReactNode }) {
   return <div className="rounded-[14px] border border-white/[.06] bg-white/[.02] p-2">{children}</div>;
 }
 
-export default function CommandRail({ band, onFlyTo }: { band: AltitudeBand; onFlyTo?: (zoom: number) => void }) {
-  const { source, objects, loading, decisions } = useIntelligence();
+export default function CommandRail({ band, onFlyTo, focusId }: { band: AltitudeBand; onFlyTo?: (zoom: number) => void; focusId?: string | null }) {
+  const { source, objects, loading, decisions, nodes } = useIntelligence();
+  // The focused entity: the building you clicked, or the home property.
+  const focus = (focusId ? nodes.find((n) => n.id === focusId) : null)
+    ?? nodes.find((n) => n.name?.includes("Terra")) ?? nodes[0];
   const [open, setOpen] = useState(true);
   const [selected, setSelected] = useState<IntelligenceObject | null>(null);
 
@@ -218,12 +221,18 @@ export default function CommandRail({ band, onFlyTo }: { band: AltitudeBand; onF
         {band === "property" ? (
           <>
             <Card>
-              <SectionTitle>Hotel Terra Neptun</SectionTitle>
+              <SectionTitle>{focus?.name ?? "Proprietate"}</SectionTitle>
               <div className="flex flex-col gap-1 px-1 pb-1 text-[11.5px]">
+                {focus?.adrRon ? (
+                  <div className="flex justify-between text-white/70">
+                    <span>Tarif afisat</span>
+                    <span className="tabular-nums text-white/85">{ron.format(focus.adrRon)} RON</span>
+                  </div>
+                ) : null}
                 <div className="flex justify-between text-white/70">
-                  <span>Pozitie vs median piata</span>
+                  <span>Median piata (azi)</span>
                   <span className="tabular-nums text-white/85">
-                    {latestRaw?.median_adr_ron != null ? `${ron.format(Number(latestRaw.median_adr_ron))} RON median` : "-"}
+                    {latestRaw?.median_adr_ron != null ? `${ron.format(Number(latestRaw.median_adr_ron))} RON` : "-"}
                   </span>
                 </div>
                 <div className="flex justify-between text-white/70">
@@ -231,6 +240,9 @@ export default function CommandRail({ band, onFlyTo }: { band: AltitudeBand; onF
                   <span className="tabular-nums text-white/85">{String(latestRaw?.soldout_count ?? "-")}/{String(latestRaw?.urlset_size ?? "-")}</span>
                 </div>
               </div>
+              {focus?.insight?.observedContext ? (
+                <div className="px-1 pb-1 text-[11px] leading-snug text-white/45">{focus.insight.observedContext}</div>
+              ) : null}
             </Card>
             {topRec ? (
               <button onClick={() => setSelected(topRec)} className="rounded-[14px] border p-3 text-left transition-opacity duration-200 hover:opacity-90" style={{ borderColor: C.money, background: C.moneySoft }}>

@@ -23,13 +23,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
 import { deriveIntel } from "@/lib/spatial-intel";
 import type { PropertyIntelligenceNode } from "@/types/spatial";
-import { HoverChip, PinPopup } from "./MapCards";
+import { HoverChip } from "./MapCards";
 import { buildPropertyExtrusions, buildPropertyGlowPoints } from "@/lib/property-extrusions";
-import AssetDashboard from "./AssetDashboard";
-// import AssetTwin from "./AssetTwin"; // 3D twin set aside for now (perf)
-import OperationsConsole from "./OperationsConsole";
-import { toast } from "@/lib/toast";
-import { supabase } from "@/lib/supabase";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
@@ -38,7 +33,7 @@ const CENTER: [number, number] = [28.596282, 43.869390];
 
 // ─── CoastalCommandCenter ────────────────────────────────────────────────────
 
-export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, onCamera, registerFlyTo }: { cinematic?: boolean; start?: boolean; locked?: boolean; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (zoom: number) => void) => void } = {}) {
+export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, onCamera, registerFlyTo, onFocus }: { cinematic?: boolean; start?: boolean; locked?: boolean; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (zoom: number) => void) => void; onFocus?: (id: string | null) => void } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<mapboxgl.Map | null>(null);
   const markersRef   = useRef<mapboxgl.Marker[]>([]);
@@ -50,6 +45,8 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
   onCameraRef.current = onCamera;
   const registerFlyToRef = useRef(registerFlyTo);
   registerFlyToRef.current = registerFlyTo;
+  const onFocusRef = useRef(onFocus);
+  onFocusRef.current = onFocus;
 
   // Single read layer: nodes (sample scaffold overlaid with live IO insight) come
   // from the one provider - never a direct NODES import. A ref keeps map event
@@ -61,24 +58,20 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
 
   const [hoveredId,  setHoveredId]  = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
-  // const [twinOpen, setTwinOpen] = useState(false); // 3D twin disabled
-  const [opsOpen, setOpsOpen] = useState(false);
   const [, setFrame] = useState(0);
   const [ready, setReady] = useState(false);
   const [tokenMissing, setTokenMissing] = useState(false);
-  const [live, setLive] = useState<Record<string, { narrative: string; delta: number; alert: string }>>({});
 
   // ── Camera flight + select ────────────────────────────────────────────────
+  // Click = navigate the world: fly to property altitude and hand focus to the rail.
+  // No windows spawn; the altitude system renders the focused entity.
   const select = (n: PropertyIntelligenceNode) => {
     if (lockedRef.current) return;
     setSelectedId(n.id);
-    setExpanded(false);
-    // (3D twin disabled)
-    setOpsOpen(false);
+    onFocusRef.current?.(n.id);
     mapRef.current?.flyTo({
       center:   n.coordinates,
-      zoom:     16.2,
+      zoom:     15.6,
       pitch:    62,
       bearing:  -20,
       duration: 2200,
@@ -276,54 +269,12 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
     return () => clearTimeout(t);
   }, [ready, start]);
 
-  // ── Supabase Realtime — live telemetry ────────────────────────────────────
-  useEffect(() => {
-    let mounted = true;
-    supabase
-      .from("property_live_telemetry")
-      .select("property_ref,narrative,recommended_delta_ron,maritime_alert")
-      .then(({ data }) => {
-        if (!mounted || !data) return;
-        setLive(Object.fromEntries(
-          (data as { property_ref: string; narrative: string; recommended_delta_ron: number; maritime_alert: string }[])
-            .map(d => [d.property_ref, { narrative: d.narrative, delta: d.recommended_delta_ron, alert: d.maritime_alert }])
-        ));
-      });
-
-    const chan = supabase
-      .channel("ooda-telemetry")
-      .on("postgres_changes", { event: "*", schema: "public", table: "property_live_telemetry" }, payload => {
-        const r = payload.new as { property_ref?: string; narrative?: string; recommended_delta_ron?: number; maritime_alert?: string };
-        if (r?.property_ref) {
-          setLive(prev => ({
-            ...prev,
-            [r.property_ref as string]: {
-              narrative: r.narrative ?? "",
-              delta:     r.recommended_delta_ron ?? 0,
-              alert:     r.maritime_alert ?? "clear",
-            },
-          }));
-        }
-      })
-      .subscribe();
-
-    return () => { mounted = false; supabase.removeChannel(chan); };
-  }, []);
 
   // ── Derived render state ──────────────────────────────────────────────────
   const map      = mapRef.current;
   const project  = (n: PropertyIntelligenceNode) => map && ready ? map.project(n.coordinates) : null;
   const hovered  = hoveredId  ? nodes.find(n => n.id === hoveredId)  ?? null : null;
-  const selected = selectedId ? nodes.find(n => n.id === selectedId) ?? null : null;
   const hp       = hovered && hovered.id !== selectedId ? project(hovered) : null;
-  const sp       = selected && !expanded ? project(selected) : null;
-  const oodaMode = selected ? (live[selected.id] ? "LIVE" : "ORIENT") : "OBSERVE";
-  const nodeCount = nodes.length;
-
-  // ── Action handler ────────────────────────────────────────────────────────
-  const onAction = (label: string) => {
-    toast(label);
-  };
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -342,54 +293,6 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
           </div>
         )}
 
-        {/* ── Top status bar ──────────────────────────────────── */}
-        <div className={`hidden ${expanded ? "hidden" : ""}`}>
-          {/* OODA mode indicator */}
-          <span className="font-mono text-[10px] tracking-[.20em]" style={{ color: "#06b6d4" }}>
-            {oodaMode}
-          </span>
-          <span className="h-3 w-px bg-white/10" />
-
-          {/* Live pulse if connected */}
-          {oodaMode === "LIVE" && (
-            <>
-              <span className="flex items-center gap-1.5 font-mono text-[10px]" style={{ color: "#06b6d4" }}>
-                <span className="size-1.5 animate-pulse rounded-full" style={{ background: "#06b6d4" }} />
-                LIVE
-              </span>
-              <span className="h-3 w-px bg-white/10" />
-            </>
-          )}
-
-          <span className="font-mono text-[11px] text-slate-200">{nodeCount} nodes</span>
-          <span className="h-3 w-px bg-white/10" />
-          <span className="font-mono text-[10px] uppercase tracking-[.12em] text-slate-500">
-            Neptun–Olimp
-          </span>
-          <span className="h-3 w-px bg-white/10" />
-          <span className="font-mono text-[10px] text-slate-500">
-            {CENTER[1].toFixed(4)}°N {CENTER[0].toFixed(4)}°E
-          </span>
-        </div>
-
-        {/* ── Node legend ─────────────────────────────────────── */}
-        <div className={`gx gx-raised absolute right-4 top-4 z-20 flex flex-col gap-2 rounded-2xl px-3.5 py-3 ${expanded ? "hidden" : ""}`}>
-          {[
-            { color: "#06b6d4", label: "Own asset" },
-            { color: "#10b981", label: "Demand tight" },
-            { color: "#5b7fa6", label: "Balanced" },
-            { color: "#f59e0b", label: "Demand soft" },
-          ].map(({ color, label }) => (
-            <div key={label} className="flex items-center gap-2">
-              <span
-                className="size-2 shrink-0 rounded-full"
-                style={{ background: color, boxShadow: `0 0 6px ${color}` }}
-              />
-              <span className="font-mono text-[10px] text-slate-400">{label}</span>
-            </div>
-          ))}
-        </div>
-
         {/* ── Hover chip ──────────────────────────────────────── */}
         <AnimatePresence>
           {!locked && hovered && hp ? (
@@ -397,42 +300,9 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
           ) : null}
         </AnimatePresence>
 
-        <AnimatePresence>{selected && opsOpen ? <OperationsConsole key={"ops-" + selected.id} propertyName={selected.name} onClose={() => setOpsOpen(false)} /> : null}</AnimatePresence>
         {/* <AssetTwin> set aside for now (perf) */}
 
-        {/* ── AssetIntelligenceSheet (progressive disclosure) ── */}
-        <AnimatePresence>
-          {selected && sp && !expanded ? (
-            <PinPopup key={selected.id} node={selected} x={sp.x} y={sp.y} live={selected ? live[selected.id] ?? null : null} onExpand={() => setExpanded(true)} onClose={() => setSelectedId(null)} />
-          ) : null}
-        </AnimatePresence>
-        <AnimatePresence>
-          {selected && expanded ? (
-            <AssetDashboard key={"dash-" + selected.id} node={selected} live={selected ? live[selected.id] ?? null : null} onClose={() => setExpanded(false)} onAction={onAction} onOpenOps={() => setOpsOpen(true)} />
-          ) : null}
-        </AnimatePresence>
 
-        {/* ── Bottom system bar ───────────────────────────────── */}
-        <div
-          className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 flex items-center gap-3 rounded-full px-4 py-1.5"
-          style={{
-            backdropFilter: "blur(12px)",
-            background:     "rgba(8, 9, 11, 0.7)",
-            border:         "1px solid rgba(255,255,255,0.06)",
-          }}
-        >
-          <span className="font-mono text-[9px] uppercase tracking-[.18em] text-slate-600">
-            Aether · Project Palantir-H
-          </span>
-          <span className="h-2 w-px bg-white/[.08]" />
-          <span className="font-mono text-[9px] text-slate-600">
-            Neptun–Olimp Corridor
-          </span>
-          <span className="h-2 w-px bg-white/[.08]" />
-          <span className="font-mono text-[9px] text-slate-600">
-            {source === "live" ? "Live market intelligence" : "Real ADR · Sample telemetry"}
-          </span>
-        </div>
 
       </div>
     </div>
