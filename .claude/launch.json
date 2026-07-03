@@ -4,7 +4,7 @@
     {
       "name": "aether",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["--prefix", "C:/Users/user/aether", "run", "dev"],
       "port": 3000
     }
   ]

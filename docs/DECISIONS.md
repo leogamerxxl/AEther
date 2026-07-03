@@ -15,3 +15,19 @@ Format per [OPERATING_DOCTRINE](AETHER_OPERATING_DOCTRINE.md): `## [DATE] — [T
 2. *Two independent axes (camera × lens), 45+ cells* — combinatorial surface no one would maintain; most combinations are meaningless (executive close-zoom).
 
 **Compatibility.** COMMAND_CENTER §1 text is superseded but not edited (history preserved); its §3 routing matrix remains valid as the per-entity surface vocabulary, now consumed per-cell. No code depended on the old definition.
+
+## 2026-07-03 — GitHub Actions cron is interim production; Oracle VM deferred
+Why: the VM (built 2026-06-14, declared production in morning-brief.yml) was never provisioned;
+the launch definition needs elapsed unattended days and the calendar is the critical path.
+Cron 02:37 UTC enabled on the hardened workflow (timeout + secret preflight + concurrency).
+Alternatives rejected: provision VM first (blocks streak on human setup); no cron (streak never starts).
+Exit condition: provision the VM as forever-home or formally retire it (TODOS.md).
+
+## 2026-07-03 — Launch deadline reset acknowledged
+The 2026-06-15 launch definition date passed without a logged amendment. New definition marker:
+7 consecutive unattended morning briefs with fresh market IOs, starting when the cron goes green.
+
+## 2026-07-03 — Free-tier pause is a production risk (observed, not theoretical)
+Supabase project auto-paused (INACTIVE) after ~10 idle days and Booking scrape DNS failed with it.
+Mitigation: daily cron doubles as keepalive; pipeline_health.missed_schedule flags silence;
+paid-tier triggers for Supabase + Apify are founder decisions logged in TODOS.md.

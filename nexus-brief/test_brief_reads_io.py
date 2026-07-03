@@ -85,8 +85,50 @@ def test_stale_io_ignored():
     print("  ok stale IO ignored -> degrade")
 
 
+def _rate_input(sid, target_date):
+    return {"kind": "comp_rate", "target_date": target_date, "subject_id": sid,
+            "value_numeric": 500, "observation_id": f"r-{sid}",
+            "observed_at": "2026-06-14T05:00:00+00:00", "confidence": 0.85}
+
+
+def test_rec_renders_from_io_when_gate_allows():
+    io = _io("2026-06-16", 800, 10, ["x1", "x2"])
+    io["severity"] = "medium"
+    io["recommended_actions"] = [{"type": "hold_or_raise", "stay_date": "2026-06-16",
+                                  "label": "Retineti sau cresteti tariful pentru 2026-06-16: 8/11 hoteluri concurente epuizate.",
+                                  "basis": {"compression": 0.7273, "soldout": 8, "observed": 10, "urlset": 11}}]
+    data = _data([io])
+    data["inputs"] += [_rate_input(f"c{i}", "2026-06-16") for i in range(10)]  # coverage 10 -> not BLOCK
+    b = G.build(G.index(data), TODAY)
+    G.check_citations(b)
+    act = _sect(b, "action")
+    txt = " ".join(act["lines_ro"])
+    assert "8/11" in txt and "epuizate" in txt, txt          # engine label rendered verbatim
+    assert act["cites"], "action must cite the IO evidence"
+    cited = next(c for c in b.citations if c["id"] == act["cites"][0])
+    assert set(cited["observation_ids"]) == {"x1", "x2"}     # citation = IO evidence chain
+    assert b.gate["recommendations_allowed"] is True
+    print("  ok rec renders from IO recommended_actions + cites evidence")
+
+
+def test_null_median_never_prints_zero():
+    io = _io("2026-06-16", 1, 0, ["y1"])  # placeholder; overridden to None below
+    io["raw_jsonb"]["median_adr_ron"] = None
+    io["raw_jsonb"]["min_adr_ron"] = None
+    io["raw_jsonb"]["max_adr_ron"] = None
+    io["causal_hypothesis"] = "Niciun tarif disponibil pentru 2026-06-16 - piata pare epuizata. Compresie: 9/11 hoteluri epuizate."
+    b = G.build(G.index(_data([io])), TODAY)
+    G.check_citations(b)
+    ms = _sect(b, "market")
+    txt = " ".join(ms["lines_ro"])
+    assert "0 RON" not in txt, txt                            # never render median 0
+    assert "epuizat" in txt.lower()
+    assert ms["cites"]
+    print("  ok null median -> compression narrative, no fabricated 0 RON")
+
 def run():
-    tests = [test_renders_from_io_under_block, test_no_io_degrades_cleanly, test_stale_io_ignored]
+    tests = [test_renders_from_io_under_block, test_no_io_degrades_cleanly, test_stale_io_ignored,
+             test_rec_renders_from_io_when_gate_allows, test_null_median_never_prints_zero]
     failed = 0
     for t in tests:
         try:

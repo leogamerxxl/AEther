@@ -9,6 +9,8 @@ name: AETHER Morning Brief
 # the daily schedule is disabled so it never double-runs against the VM.
 on:
   workflow_dispatch: {}
+  schedule:
+    - cron: '37 2 * * *'  # 05:37 EEST - interim production (DECISIONS.md 2026-07-03); VM was never provisioned
 
 concurrency:
   group: morning-brief
@@ -32,7 +34,7 @@ jobs:
       ALERT_FROM: onboarding@resend.dev
       OTB_SHEET_ID: ${{ secrets.OTB_SHEET_ID }}
       OTB_CAPACITY: '52'
-      RATES_DAYS: '14'
+      RATES_DAYS: '7'
       MIN_RATE_COVERAGE: '10'
       BRIEF_TZ_OFFSET_H: '3'
     steps:
@@ -70,6 +72,15 @@ jobs:
       - name: Validate
         continue-on-error: true
         run: python nexus-scrape/validate.py
+      - name: Signals (market compression)
+        continue-on-error: true
+        run: python nexus-scrape/signal_engine.py
+      - name: Signals (weather)
+        continue-on-error: true
+        run: python nexus-scrape/signal_weather.py
+      - name: Ontology sync
+        continue-on-error: true
+        run: python nexus-scrape/ontology_sync.py
       - name: Generate brief
         run: python nexus-brief/generator.py
       - name: Send brief

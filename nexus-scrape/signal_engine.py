@@ -24,7 +24,7 @@ from lib.provenance import SOURCE_APIFY, PROPERTY_TERRA, rate_confidence  # noqa
 
 COMP_SET_TERRA = "497f9665-d8bc-4e0a-ba01-6dda25c2d9b7"
 COMP_SET_SIZE = 12
-ENGINE_VERSION = "signal_engine_v1"
+ENGINE_VERSION = "signal_engine_v2"
 HORIZON_DEFAULT = int(os.environ.get("SIGNALS_HORIZON", "7"))
 MIN_COVERAGE = int(os.environ.get("MIN_RATE_COVERAGE", "10"))
 FRESH_WINDOW_H = int(os.environ.get("SIGNALS_FRESH_WINDOW_H", "48"))
@@ -69,34 +69,95 @@ def load_latest_rates(sb, horizon, fresh_window_h):
     return list(latest.values())
 
 
-def build_objects(latest_rows, fx, now_iso, expires_iso):
+NEAR_SOLDOUT_ROOMS = 2
+REC_FLOOR_OBSERVED = 6
+COMPRESSION_MED = 0.5
+COMPRESSION_HIGH = 0.75
+
+
+def _is_soldout(r):
+    amt = r.get("rate_amount")
+    if r.get("availability_state") == "sold_out":
+        return True
+    try:
+        return amt is None or float(amt) <= 0
+    except (TypeError, ValueError):
+        return True
+
+
+def build_objects(latest_rows, fx, now_iso, expires_iso, urlset_size=None, name_map=None):
+    """Per upcoming stay-date: median ADR over PRICED comps plus sell-out compression over
+    the scraped set. Sold-out comps are evidence for compression, never median input.
+    Denominator = scraped URL set size (sold-out hotels can vanish from Booking results
+    entirely, so observed-row counts undercount compression)."""
+    name_map = name_map or {}
     by_date = {}
     for r in latest_rows:
-        ron = _to_ron(r.get("rate_amount"), r.get("currency_code"), fx)
-        # sold-out / unpriced comps are stored as rate_amount=0; exclude them from
-        # the ADR median so the market signal reflects only bookable prices.
-        if ron is None or ron <= 0:
-            continue
-        by_date.setdefault(r["stay_date"], []).append((ron, r))
+        by_date.setdefault(r["stay_date"], []).append(r)
 
     objs = []
     for stay_date in sorted(by_date):
-        items = by_date[stay_date]
-        adrs = [a for a, _ in items]
-        rows = [r for _, r in items]
-        coverage = len(rows)
-        med = round(statistics.median(adrs), 2)
-        lo, hi = round(min(adrs), 2), round(max(adrs), 2)
-        quality = sum(rate_confidence(r) for r in rows) / coverage
-        coverage_factor = min(1.0, coverage / COMP_SET_SIZE)
-        confidence = round(quality * coverage_factor, 4)
+        rows = by_date[stay_date]
+        priced, soldout = [], []
+        for r in rows:
+            if _is_soldout(r):
+                soldout.append(r)
+                continue
+            ron = _to_ron(r.get("rate_amount"), r.get("currency_code"), fx)
+            if ron is None or ron <= 0:
+                continue  # unknown currency -> excluded from BOTH, never guessed
+            priced.append((ron, r))
+        observed = len(priced) + len(soldout)
+        if observed == 0:
+            continue
+        near = [r for _, r in priced
+                if r.get("rooms_remaining") is not None and r["rooms_remaining"] <= NEAR_SOLDOUT_ROOMS]
+        denom = urlset_size or COMP_SET_SIZE
+        compression = round((len(soldout) + 0.5 * len(near)) / denom, 4)
+
+        adrs = [a for a, _ in priced]
+        med = round(statistics.median(adrs), 2) if adrs else None
+        lo = round(min(adrs), 2) if adrs else None
+        hi = round(max(adrs), 2) if adrs else None
         disp_pct = round((hi - lo) / med * 100, 1) if med else 0.0
+        counted = [r for _, r in priced] + soldout
+        quality = sum(rate_confidence(r) for r in counted) / len(counted)
+        confidence = round(quality * min(1.0, observed / COMP_SET_SIZE), 4)
+        coverage = len(priced)
         thin = coverage < MIN_COVERAGE
 
-        causal = (f"Median comp-set pentru {stay_date}: {med} RON pe {coverage}/{COMP_SET_SIZE} "
-                  f"hoteluri. Interval {lo}-{hi} RON (dispersie {disp_pct}%).")
-        if thin:
+        recs = []
+        severity = "info" if thin else "low"
+        if observed >= REC_FLOOR_OBSERVED and compression >= COMPRESSION_MED:
+            severity = "high" if compression >= COMPRESSION_HIGH else "medium"
+            recs = [{
+                "type": "hold_or_raise",
+                "stay_date": stay_date,
+                "label": (f"Retineti sau cresteti tariful pentru {stay_date}: "
+                          f"{len(soldout)}/{denom} hoteluri concurente epuizate."),
+                "basis": {"compression": compression, "soldout": len(soldout),
+                          "near_soldout": len(near), "observed": observed, "urlset": denom},
+            }]
+
+        if med is not None:
+            causal = (f"Median comp-set pentru {stay_date}: {med} RON pe {coverage}/{COMP_SET_SIZE} "
+                      f"hoteluri. Interval {lo}-{hi} RON (dispersie {disp_pct}%).")
+        else:
+            causal = f"Niciun tarif disponibil pentru {stay_date} - piata pare epuizata."
+        causal += (f" Compresie: {len(soldout)}/{denom} hoteluri epuizate"
+                   + (f", {len(near)} aproape pline" if near else "") + ".")
+        if thin and not recs:
             causal += f" Acoperire sub prag ({coverage}/{MIN_COVERAGE}) - fara recomandare."
+
+        def _comp_entry(r):
+            sold = _is_soldout(r)
+            return {"name": name_map.get(r.get("scraped_property_id")),
+                    "rate_ron": (None if sold else _to_ron(r.get("rate_amount"), r.get("currency_code"), fx)),
+                    "availability_state": ("sold_out" if sold else r.get("availability_state") or "available"),
+                    "rooms_remaining": r.get("rooms_remaining"),
+                    "observed_at": r.get("observed_at")}
+        comps = sorted((_comp_entry(r) for r in counted),
+                       key=lambda e: (e["availability_state"] != "sold_out", str(e["observed_at"])), )
 
         objs.append({
             "altitude_level": "market",
@@ -104,17 +165,17 @@ def build_objects(latest_rows, fx, now_iso, expires_iso):
             "entity_id": COMP_SET_TERRA,
             "property_id": PROPERTY_TERRA,
             "signal_type": "market_rate_pressure",
-            "severity": "info" if thin else "low",
+            "severity": severity,
             "confidence": confidence,
             "evidence": [{
                 "source_id": SOURCE_APIFY,
-                "observation_ids": [r["id"] for r in rows],
-                "observed_at": max(r["observed_at"] for r in rows),
+                "observation_ids": [r["id"] for r in counted],
+                "observed_at": max(str(r["observed_at"]) for r in counted),
                 "coverage": coverage,
             }],
             "causal_hypothesis": causal,
             "forecast_impact": None,
-            "recommended_actions": [],
+            "recommended_actions": recs,
             "visual_anchor": {"kind": "market", "label": "Comp-set litoral",
                               "property_id": PROPERTY_TERRA},
             "status": "active",
@@ -124,11 +185,11 @@ def build_objects(latest_rows, fx, now_iso, expires_iso):
             "engine_version": ENGINE_VERSION,
             "raw_jsonb": {"stay_date": stay_date, "median_adr_ron": med, "min_adr_ron": lo,
                           "max_adr_ron": hi, "coverage": coverage, "dispersion_pct": disp_pct,
-                          "currency": "RON"},
+                          "compression": compression, "soldout_count": len(soldout),
+                          "near_count": len(near), "observed": observed, "urlset_size": denom,
+                          "comps": comps, "currency": "RON"},
         })
     return objs
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--horizon", type=int, default=HORIZON_DEFAULT)
@@ -160,8 +221,12 @@ def main():
     try:
         fx = latest_fx(sb)
         latest_rows = load_latest_rates(sb, args.horizon, args.fresh_window_h)
+        props = sb.select("scraped_properties", select="id,name,booking_url") or []
+        name_map = {p["id"]: p.get("name") for p in props}
+        urlset = sum(1 for p in props if p.get("booking_url")) or None
         now_iso, expires_iso = iso(utcnow()), iso(utcnow() + timedelta(hours=24))
-        objs = build_objects(latest_rows, fx, now_iso, expires_iso)
+        objs = build_objects(latest_rows, fx, now_iso, expires_iso,
+                             urlset_size=urlset, name_map=name_map)
         summary = {
             "horizon": args.horizon, "fresh_window_h": args.fresh_window_h,
             "rate_rows": len(latest_rows), "objects": len(objs),

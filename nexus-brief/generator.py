@@ -255,6 +255,8 @@ def build(ctx, today):
     now = utcnow()
     market_ios = {sd: io for sd, io in ctx["market_ios"].items()
                   if sd >= today.isoformat() and io_freshness(io, now) in ("fresh", "cooling")}
+    io_recs = [(sd, io) for sd, io in sorted(market_ios.items())
+               if (io.get("recommended_actions") or [])]
     if rates_dead or not market_ios:
         if rates_dead:
             last = (s.get("collector.booking_rates") or {}).get("last_observed_at")
@@ -269,19 +271,29 @@ def build(ctx, today):
         d7 = sorted(market_ios)[:7]
         ios7 = [market_ios[d] for d in d7]
         b.rendered_io_ids += [io["id"] for io in ios7 if io.get("id")]
-        meds = {d: round(fnum((market_ios[d].get("raw_jsonb") or {}).get("median_adr_ron"))) for d in d7}
+        meds = {d: round(v) for d in d7
+                for v in [(market_ios[d].get("raw_jsonb") or {}).get("median_adr_ron")]
+                if v is not None}
         cov = max(int((market_ios[d].get("raw_jsonb") or {}).get("coverage", 0)) for d in d7)
-        lo_d, hi_d = min(meds, key=meds.get), max(meds, key=meds.get)
         obs_ids = [oid for d in d7 for ev in (market_ios[d].get("evidence") or [])
                    for oid in (ev.get("observation_ids") or [])]
-        cid = b.cite_io(f"median piata {ddmm(lo_d)}-{ddmm(hi_d)}", obs_ids,
-                        "intelligence_objects.market_rate_pressure (median/stay_date, 7d)")
-        b.section("market", T["market_t"],
-                  [T["market_line"].format(n=cov, lo=meds[lo_d],
-                                           lo_d=f"{dow(lo_d)} {ddmm(lo_d)}", hi=meds[hi_d],
-                                           hi_d=f"{dow(hi_d)} {ddmm(hi_d)}")],
-                  [f"Market median {meds[lo_d]}-{meds[hi_d]} RON, next 7 nights ({cov} hotels)."],
-                  io_prov_line(ios7, "AETHER signal engine (Booking via Apify)", now), [cid])
+        if meds:
+            lo_d, hi_d = min(meds, key=meds.get), max(meds, key=meds.get)
+            cid = b.cite_io(f"median piata {ddmm(lo_d)}-{ddmm(hi_d)}", obs_ids,
+                            "intelligence_objects.market_rate_pressure (median/stay_date, 7d)")
+            b.section("market", T["market_t"],
+                      [T["market_line"].format(n=cov, lo=meds[lo_d],
+                                               lo_d=f"{dow(lo_d)} {ddmm(lo_d)}", hi=meds[hi_d],
+                                               hi_d=f"{dow(hi_d)} {ddmm(hi_d)}")],
+                      [f"Market median {meds[lo_d]}-{meds[hi_d]} RON, next 7 nights ({cov} hotels)."],
+                      io_prov_line(ios7, "AETHER signal engine (Booking via Apify)", now), [cid])
+        else:
+            cid = b.cite_io("piata epuizata (fara tarife disponibile)", obs_ids,
+                            "intelligence_objects.market_rate_pressure (compression; priced=0)")
+            b.section("market", T["market_t"],
+                      [ios7[0].get("causal_hypothesis") or T["market_no_io"]],
+                      ["Market largely sold out - no bookable prices observed."],
+                      io_prov_line(ios7, "AETHER signal engine (Booking via Apify)", now), [cid])
 
     # 2 pressure
     pressed = {d: v for d, v in ctx["press"].items() if len(v) >= 3}
@@ -378,6 +390,20 @@ def build(ctx, today):
         b.section("action", T["action_t"], [T["action_none"].format(why=why)],
                   [f"NO RECOMMENDATION TODAY - {why}."])
         b.section("impact", T["impact_t"], ["—"], ["-"])
+    elif io_recs:
+        # Canonical path: the engine computed the recommendation; the brief renders it.
+        sev_rank = {"critical": 4, "high": 3, "medium": 2}
+        sd, rio = max(io_recs, key=lambda kv: (sev_rank.get(kv[1].get("severity"), 0), kv[0]))
+        act = (rio.get("recommended_actions") or [])[0]
+        basis = act.get("basis") or {}
+        r_obs = [oid for ev in (rio.get("evidence") or []) for oid in (ev.get("observation_ids") or [])]
+        cid = b.cite_io(f"recomandare {ddmm(sd)}", r_obs,
+                        "intelligence_objects.market_rate_pressure recommended_actions (compression)")
+        b.section("action", T["action_t"],
+                  [act.get("label") or T["action_dir"].format(d=ddmm(sd))],
+                  [f"Hold or raise for {ddmm(sd)}: {basis.get('soldout')}/{basis.get('urlset')} comps sold out."],
+                  None, [cid])
+        b.section("impact", T["impact_t"], [T["impact_no_otb"]], ["Needs OTB."])
     elif pressed:
         tgt = sorted(pressed)[0]
         otb_d = ctx["otb_by_date"].get(tgt, {})
