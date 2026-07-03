@@ -38,7 +38,7 @@ const CENTER: [number, number] = [28.596282, 43.869390];
 
 // ─── CoastalCommandCenter ────────────────────────────────────────────────────
 
-export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false }: { cinematic?: boolean; start?: boolean; locked?: boolean } = {}) {
+export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, onCamera, registerFlyTo }: { cinematic?: boolean; start?: boolean; locked?: boolean; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (zoom: number) => void) => void } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<mapboxgl.Map | null>(null);
   const markersRef   = useRef<mapboxgl.Marker[]>([]);
@@ -46,6 +46,10 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
   const bootedRef    = useRef(false);
   const lockedRef    = useRef(locked);
   lockedRef.current  = locked;
+  const onCameraRef = useRef(onCamera);
+  onCameraRef.current = onCamera;
+  const registerFlyToRef = useRef(registerFlyTo);
+  registerFlyToRef.current = registerFlyTo;
 
   // Single read layer: nodes (sample scaffold overlaid with live IO insight) come
   // from the one provider - never a direct NODES import. A ref keeps map event
@@ -115,7 +119,13 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
       try { map.setFog({ "color": "#0a0a0c", "high-color": "#000000", "space-color": "#000000", "horizon-blend": 0.02, "star-intensity": 0.12 }); } catch { /* noop */ }
     });
 
-    map.on("load", () => setReady(true));
+    map.on("load", () => {
+      setReady(true);
+      try { onCameraRef.current?.(map.getZoom()); } catch { /* noop */ }
+      registerFlyToRef.current?.((zoom: number) => {
+        try { map.flyTo({ zoom, duration: 1600, essential: true }); } catch { /* noop */ }
+      });
+    });
 
     // RAF-throttled re-render for marker projections
     const bump = () => {
@@ -123,6 +133,7 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = 0;
         setFrame(f => (f + 1) % 1_000_000);
+        try { onCameraRef.current?.(map.getZoom()); } catch { /* noop */ }
       });
     };
     map.on("move", bump);

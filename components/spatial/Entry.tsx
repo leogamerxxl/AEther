@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { LogOut, User, Settings, Bell, MapPin, Package, Plug, Database, Gem, CreditCard } from "lucide-react";
@@ -12,6 +12,8 @@ import RevenueCommand from "./RevenueCommand";
 import OperationsCommand from "./OperationsCommand";
 import { SpatialIntelligenceProvider } from "./intelligence/SpatialIntelligenceProvider";
 import CommandRail from "./intelligence/CommandRail";
+import AltitudeLadder from "./intelligence/AltitudeLadder";
+import { bandForZoom } from "@/lib/altitude";
 import AuthGate from "./AuthGate";
 import { Toaster } from "./Toast";
 import { toast } from "@/lib/toast";
@@ -33,6 +35,10 @@ export default function Entry() {
   const [verifying, setVerifying] = useState(false);
   const [appView, setAppView] = useState<"map" | "revenue" | "operations">("map");
   const [settings, setSettings] = useState<{ open: boolean; section: SettingsSection }>({ open: false, section: "profile" });
+  const [zoom, setZoom] = useState(14.2);
+  const flyRef = useRef<((zoom: number) => void) | null>(null);
+  const band = bandForZoom(zoom);
+  const flyTo = (z: number) => flyRef.current?.(z);
   const openSettings = (section: SettingsSection) => setSettings({ open: true, section });
 
   useEffect(() => { setSession(getSession()); setHydrated(true); }, []);
@@ -89,11 +95,16 @@ export default function Entry() {
       ) : hydrated && session && appView === "operations" ? (
         <OperationsCommand onOpenMap={() => setAppView("map")} />
       ) : (
-        <CoastalCommandCenter cinematic start={revealed} locked={!session} />
+        <CoastalCommandCenter cinematic start={revealed} locked={!session} onCamera={setZoom} registerFlyTo={(fn) => { flyRef.current = fn; }} />
       )}
 
       {/* The map's operating rail - authenticated command surface (desktop) */}
-      {hydrated && session && !isStaff && appView === "map" ? <CommandRail /> : null}
+      {hydrated && session && !isStaff && appView === "map" ? (
+        <>
+          <CommandRail band={band} onFlyTo={flyTo} />
+          <AltitudeLadder band={band} onFlyTo={flyTo} />
+        </>
+      ) : null}
 
       {hydrated && session && !isStaff ? (
         <div className="gx gx-bento fixed left-1/2 top-4 z-[82] flex -translate-x-1/2 items-center gap-1 rounded-full p-1">
