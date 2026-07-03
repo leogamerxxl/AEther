@@ -5,17 +5,19 @@
 // fetches or derives on its own - they read from here.
 
 import { createContext, useContext, type ReactNode } from "react";
-import { useSpatialIntelligence } from "@/lib/intelligence";
-import type { SpatialIntelligence } from "@/lib/intelligence-map";
+import { useSpatialIntelligence, type IntelligenceState } from "@/lib/intelligence";
 import { NODES } from "@/lib/spatial-data";
 
-type IntelligenceValue = SpatialIntelligence & { loading: boolean };
+type IntelligenceValue = IntelligenceState;
 
 const IntelligenceContext = createContext<IntelligenceValue | null>(null);
 
 // Used when a consumer renders OUTSIDE the provider (e.g. the /showcase design
 // route). Honest SAMPLE - no fetch, labeled by the consuming UI.
-const SAMPLE_DEFAULT: IntelligenceValue = { source: "sample", nodes: NODES, objects: [], loading: false };
+const SAMPLE_DEFAULT: IntelligenceValue = {
+  source: "sample", nodes: NODES, objects: [], loading: false, decisions: {},
+  decide: async () => ({ ok: false, error: "sample mode" }),
+};
 
 export function SpatialIntelligenceProvider({ children }: { children: ReactNode }) {
   const value = useSpatialIntelligence();

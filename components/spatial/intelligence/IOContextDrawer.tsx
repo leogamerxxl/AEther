@@ -5,10 +5,12 @@
 // raw IO for traceability. NIGHT HARBOR: command-theme accents only (cyan = live,
 // amber = money/action, neutral = idle), gx-bento glass, the one framer spring.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { C, confidenceColor } from "@/lib/command-theme";
+import { useIntelligence } from "./SpatialIntelligenceProvider";
+import { toast } from "@/lib/toast";
 import { SPRING, TRANSITION } from "@/lib/motion";
 import { ioFreshness, evidenceCount, type IntelligenceObject, type Freshness } from "@/lib/intelligence-map";
 
@@ -75,9 +77,21 @@ export default function IOContextDrawer({ io, onClose }: { io: IntelligenceObjec
 
 function Drawer({ io, onClose }: { io: IntelligenceObject; onClose: () => void }) {
   const fresh = ioFreshness(io);
-  const sev = severityColor(io.severity);
   const pct = Math.round(io.confidence * 100);
   const recs = io.recommended_actions ?? [];
+  // Kind-aware severity: a rec-bearing signal is an OPPORTUNITY - it must never paint
+  // verdict-red at the peak trust moment. Harbor = action; severity text stays visible.
+  const sev = recs.length > 0 ? C.money : severityColor(io.severity);
+  const { source, decisions, decide } = useIntelligence();
+  const decision = decisions[io.id];
+  const [pending, setPending] = useState<"accepted" | "dismissed" | null>(null);
+  const act = async (d: "accepted" | "dismissed") => {
+    if (pending || decision) return;
+    setPending(d);
+    const res = await decide(io, d);
+    setPending(null);
+    if (!res.ok) toast(`Nu s-a putut inregistra decizia: ${res.error ?? "eroare"}`);
+  };
 
   return (
     <>
@@ -117,17 +131,48 @@ function Drawer({ io, onClose }: { io: IntelligenceObject; onClose: () => void }
       <div>
         <Eyebrow>Recommended actions</Eyebrow>
         {recs.length > 0 ? (
-          <ul className="mt-1.5 flex flex-col gap-1.5">
-            {recs.map((a, i) => (
-              <li
-                key={i}
-                className="rounded-md border px-3 py-2 text-[12.5px] text-white/85"
-                style={{ borderColor: C.moneySoft, background: C.moneySoft }}
-              >
-                {String(a.label ?? a.type ?? "action")}
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="mt-1.5 flex flex-col gap-1.5">
+              {recs.map((a, i) => (
+                <li
+                  key={i}
+                  className="rounded-md border px-3 py-2 text-[12.5px] text-white/85"
+                  style={{ borderColor: C.moneySoft, background: C.moneySoft }}
+                >
+                  {String(a.label ?? a.type ?? "action")}
+                </li>
+              ))}
+            </ul>
+            {decision ? (
+              <div className="mt-2 flex items-center gap-2 rounded-md border border-white/[.08] bg-white/[.03] px-3 py-2 text-[12px]">
+                <span className="size-1.5 rounded-full" style={{ background: decision.decision === "accepted" ? C.money : C.idle }} />
+                <span className="text-white/75">
+                  {decision.decision === "accepted" ? "Decizie inregistrata: acceptata" : "Decizie inregistrata: respinsa"}
+                </span>
+                <span className="ml-auto tabular-nums text-white/40">{fmtTs(decision.decided_at)}</span>
+              </div>
+            ) : source === "live" ? (
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => act("accepted")}
+                  disabled={pending !== null}
+                  aria-label="Accepta recomandarea"
+                  className="flex-1 rounded-[10px] border px-3 py-2 text-[12.5px] font-medium text-white/90 transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
+                  style={{ borderColor: C.money, background: C.moneySoft }}
+                >
+                  {pending === "accepted" ? "Se inregistreaza..." : "Accepta"}
+                </button>
+                <button
+                  onClick={() => act("dismissed")}
+                  disabled={pending !== null}
+                  aria-label="Respinge recomandarea"
+                  className="flex-1 rounded-[10px] border border-white/[.12] px-3 py-2 text-[12.5px] font-medium text-white/60 transition-opacity duration-200 hover:text-white/85 disabled:opacity-50"
+                >
+                  {pending === "dismissed" ? "Se inregistreaza..." : "Respinge"}
+                </button>
+              </div>
+            ) : null}
+          </>
         ) : (
           <p className="mt-1.5 text-[12.5px] text-white/45">No recommendation - data below the action threshold (Truth Doctrine).</p>
         )}

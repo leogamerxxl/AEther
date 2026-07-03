@@ -11,6 +11,7 @@ import StaffFeed from "./StaffFeed";
 import RevenueCommand from "./RevenueCommand";
 import OperationsCommand from "./OperationsCommand";
 import { SpatialIntelligenceProvider } from "./intelligence/SpatialIntelligenceProvider";
+import CommandRail from "./intelligence/CommandRail";
 import AuthGate from "./AuthGate";
 import { Toaster } from "./Toast";
 import { toast } from "@/lib/toast";
@@ -90,6 +91,9 @@ export default function Entry() {
       ) : (
         <CoastalCommandCenter cinematic start={revealed} locked={!session} />
       )}
+
+      {/* The map's operating rail - authenticated command surface (desktop) */}
+      {hydrated && session && !isStaff && appView === "map" ? <CommandRail /> : null}
 
       {hydrated && session && !isStaff ? (
         <div className="gx gx-bento fixed left-1/2 top-4 z-[82] flex -translate-x-1/2 items-center gap-1 rounded-full p-1">
