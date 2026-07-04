@@ -4,27 +4,14 @@
 // its end, and beneath it the oversized thin display title that names where you
 // are, overlaying the map. One chrome system - nothing else floats up top.
 
-import { motion } from "framer-motion";
 import { C } from "@/lib/command-theme";
-import { TRANSITION } from "@/lib/motion";
-import { BANDS, bandMeta, type AltitudeBand } from "@/lib/altitude";
+import { BANDS, type AltitudeBand } from "@/lib/altitude";
 import { useIntelligence } from "./SpatialIntelligenceProvider";
 
-const TITLES: Record<AltitudeBand, string> = {
-  globe: "Piete globale",
-  country: "Romania",
-  region: "Litoralul",
-  market: "Neptun-Olimp",
-  property: "Hotel Terra Neptun",
-  twin: "Interior - Terra",
-};
-
-export default function WorldChrome({ band, focusName, onFlyTo }: {
-  band: AltitudeBand; focusName?: string | null; onFlyTo: (zoom: number) => void;
+export default function WorldChrome({ band, onFlyTo }: {
+  band: AltitudeBand; onFlyTo: (zoom: number) => void;
 }) {
   const { source, loading } = useIntelligence();
-  const meta = bandMeta(band);
-  const title = band === "property" && focusName ? focusName : TITLES[band];
 
   return (
     <>
@@ -57,17 +44,6 @@ export default function WorldChrome({ band, focusName, onFlyTo }: {
         )}
       </div>
 
-      {/* The oversized display title over the world - names the current altitude */}
-      <motion.div
-        key={title}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={TRANSITION.standard}
-        className="pointer-events-none fixed left-5 top-[64px] z-[81] hidden w-[360px] lg:block"
-      >
-        <h1 className="large-title text-white/95" style={{ fontSize: 32 }}>{title}</h1>
-        <div className="mt-0.5 text-[10px] uppercase tracking-[.16em] text-white/40">{meta.trail}</div>
-      </motion.div>
     </>
   );
 }

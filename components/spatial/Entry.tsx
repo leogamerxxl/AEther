@@ -12,9 +12,10 @@ import { SpatialIntelligenceProvider } from "./intelligence/SpatialIntelligenceP
 import CommandRail from "./intelligence/CommandRail";
 import WorldChrome from "./intelligence/WorldChrome";
 import WorldControls from "./intelligence/WorldControls";
-import VarianceBoard from "./intelligence/VarianceBoard";
-import MapPulseChip from "./intelligence/MapPulseChip";
-import { NODE_BY_ID } from "@/lib/spatial-data";
+import RightFeed from "./intelligence/RightFeed";
+import PressureTimeline from "./intelligence/PressureTimeline";
+import IOContextDrawer from "./intelligence/IOContextDrawer";
+import type { IntelligenceObject } from "@/lib/intelligence-map";
 import { bandForZoom } from "@/lib/altitude";
 import AuthGate from "./AuthGate";
 import { Toaster } from "./Toast";
@@ -36,6 +37,7 @@ export default function Entry() {
   const [ctaShown, setCtaShown] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [selectedIo, setSelectedIo] = useState<IntelligenceObject | null>(null);
   const camRef = useRef<{ zoomBy: (d: number) => void; home: () => void } | null>(null);
   const [settings, setSettings] = useState<{ open: boolean; section: SettingsSection }>({ open: false, section: "profile" });
   const [zoom, setZoom] = useState(14.2);
@@ -105,13 +107,12 @@ export default function Entry() {
       {/* The map's operating rail - authenticated command surface (desktop) */}
       {hydrated && session && !isStaff ? (
         <>
-          <CommandRail band={band} onFlyTo={flyTo} focusId={focusId} />
-          <WorldChrome band={band} focusName={focusId ? NODE_BY_ID.get(focusId)?.name : null} onFlyTo={flyTo} />
+          <CommandRail band={band} onFlyTo={flyTo} focusId={focusId} onPick={setSelectedIo} />
+          <RightFeed onPick={setSelectedIo} />
+          {band === "market" ? <PressureTimeline onPick={setSelectedIo} /> : null}
+          <WorldChrome band={band} onFlyTo={flyTo} />
           <WorldControls zoomBy={(d) => camRef.current?.zoomBy(d)} home={() => camRef.current?.home()} />
-          <div className="fixed bottom-4 right-16 z-[78] hidden flex-col items-end gap-2 lg:flex">
-            {band === "market" ? <MapPulseChip /> : null}
-            {band === "market" || band === "region" ? <VarianceBoard /> : null}
-          </div>
+          <IOContextDrawer io={selectedIo} onClose={() => setSelectedIo(null)} />
         </>
       ) : null}
 
