@@ -20,6 +20,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
 import { buildCoastalZones, buildZoneLabels } from "@/lib/coastal-zones";
 import { bandMeta, type AltitudeBand } from "@/lib/altitude";
+import { createResortLayer, RESORT_LAYER_ID, RESORT_MIN_ZOOM } from "@/lib/world/resort-scene";
 import { deriveIntel } from "@/lib/spatial-intel";
 import type { PropertyIntelligenceNode } from "@/types/spatial";
 import AssetDashboard from "./AssetDashboard";
@@ -157,6 +158,18 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
 
     map.on("load", () => {
       setReady(true);
+      // Crafted resort scene (three.js custom layer) owns the close-up world;
+      // basemap 3D massing yields to it past the threshold (no double buildings).
+      try { if (!map.getLayer(RESORT_LAYER_ID)) map.addLayer(createResortLayer()); } catch { /* noop */ }
+      let resortActive = false;
+      const swap3D = () => {
+        const on = map.getZoom() >= RESORT_MIN_ZOOM;
+        if (on === resortActive) return;
+        resortActive = on;
+        try { map.setConfigProperty("basemap", "show3dObjects", !on); } catch { /* noop */ }
+      };
+      map.on("zoomend", swap3D);
+      swap3D();
       try { onCameraRef.current?.(map.getZoom()); } catch { /* noop */ }
       registerFlyToRef.current?.((band: AltitudeBand) => {
         try {
