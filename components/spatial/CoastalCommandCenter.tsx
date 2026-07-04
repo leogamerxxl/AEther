@@ -33,7 +33,7 @@ const CENTER: [number, number] = [28.596282, 43.869390];
 
 // ─── CoastalCommandCenter ────────────────────────────────────────────────────
 
-export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, onCamera, registerFlyTo, onFocus }: { cinematic?: boolean; start?: boolean; locked?: boolean; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (zoom: number) => void) => void; onFocus?: (id: string | null) => void } = {}) {
+export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, onCamera, registerFlyTo, registerCamera, onFocus }: { cinematic?: boolean; start?: boolean; locked?: boolean; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (zoom: number) => void) => void; registerCamera?: (ops: { zoomBy: (d: number) => void; home: () => void }) => void; onFocus?: (id: string | null) => void } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<mapboxgl.Map | null>(null);
   const markersRef   = useRef<mapboxgl.Marker[]>([]);
@@ -47,6 +47,8 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
   registerFlyToRef.current = registerFlyTo;
   const onFocusRef = useRef(onFocus);
   onFocusRef.current = onFocus;
+  const registerCameraRef = useRef(registerCamera);
+  registerCameraRef.current = registerCamera;
 
   // Single read layer: nodes (sample scaffold overlaid with live IO insight) come
   // from the one provider - never a direct NODES import. A ref keeps map event
@@ -117,6 +119,14 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
       try { onCameraRef.current?.(map.getZoom()); } catch { /* noop */ }
       registerFlyToRef.current?.((zoom: number) => {
         try { map.flyTo({ zoom, duration: 1600, essential: true }); } catch { /* noop */ }
+      });
+      registerCameraRef.current?.({
+        zoomBy: (d: number) => { try { map.easeTo({ zoom: map.getZoom() + d, duration: 400 }); } catch { /* noop */ } },
+        home: () => {
+          try {
+            map.flyTo({ center: HOME?.coordinates ?? CENTER, zoom: 15.6, pitch: 62, bearing: -20, duration: 2000, essential: true });
+          } catch { /* noop */ }
+        },
       });
     });
 

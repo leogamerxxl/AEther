@@ -10,8 +10,11 @@ import CoastalCommandCenter from "./CoastalCommandCenter";
 import StaffFeed from "./StaffFeed";
 import { SpatialIntelligenceProvider } from "./intelligence/SpatialIntelligenceProvider";
 import CommandRail from "./intelligence/CommandRail";
-import AltitudeLadder from "./intelligence/AltitudeLadder";
 import WorldChrome from "./intelligence/WorldChrome";
+import WorldControls from "./intelligence/WorldControls";
+import VarianceBoard from "./intelligence/VarianceBoard";
+import MapPulseChip from "./intelligence/MapPulseChip";
+import { NODE_BY_ID } from "@/lib/spatial-data";
 import { bandForZoom } from "@/lib/altitude";
 import AuthGate from "./AuthGate";
 import { Toaster } from "./Toast";
@@ -33,6 +36,7 @@ export default function Entry() {
   const [ctaShown, setCtaShown] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const camRef = useRef<{ zoomBy: (d: number) => void; home: () => void } | null>(null);
   const [settings, setSettings] = useState<{ open: boolean; section: SettingsSection }>({ open: false, section: "profile" });
   const [zoom, setZoom] = useState(14.2);
   const flyRef = useRef<((zoom: number) => void) | null>(null);
@@ -95,15 +99,17 @@ export default function Entry() {
       {hydrated && isStaff ? (
         <StaffFeed role={role!} />
       ) : (
-        <CoastalCommandCenter cinematic start={revealed} locked={!session} onCamera={setZoom} registerFlyTo={(fn) => { flyRef.current = fn; }} onFocus={setFocusId} />
+        <CoastalCommandCenter cinematic start={revealed} locked={!session} onCamera={setZoom} registerFlyTo={(fn) => { flyRef.current = fn; }} registerCamera={(ops) => { camRef.current = ops; }} onFocus={setFocusId} />
       )}
 
       {/* The map's operating rail - authenticated command surface (desktop) */}
       {hydrated && session && !isStaff ? (
         <>
           <CommandRail band={band} onFlyTo={flyTo} focusId={focusId} />
-          <AltitudeLadder band={band} onFlyTo={flyTo} />
-          <WorldChrome band={band} />
+          <WorldChrome band={band} focusName={focusId ? NODE_BY_ID.get(focusId)?.name : null} onFlyTo={flyTo} />
+          <WorldControls zoomBy={(d) => camRef.current?.zoomBy(d)} home={() => camRef.current?.home()} />
+          {band === "market" || band === "region" ? <VarianceBoard /> : null}
+          {band === "market" ? <MapPulseChip /> : null}
         </>
       ) : null}
 
