@@ -16,7 +16,8 @@ import {
 
 // Decision record (io_actions): the authenticated owner accepted/dismissed a
 // recommendation. Read back so a decision survives refresh (never write-only).
-export type IoDecision = { decision: "accepted" | "dismissed"; decided_at: string };
+export type IoDecision = { decision: "accepted" | "dismissed"; decided_at: string;
+  verdict?: "supported" | "contradicted" | "inconclusive" };
 export type DecisionMap = Record<string, IoDecision>;
 
 export async function fetchDecisions(ioIds: string[]): Promise<DecisionMap> {
@@ -31,6 +32,16 @@ export async function fetchDecisions(ioIds: string[]): Promise<DecisionMap> {
     for (const r of data as { io_id: string; decision: IoDecision["decision"]; decided_at: string }[]) {
       map[r.io_id] = { decision: r.decision, decided_at: r.decided_at };
     }
+    // outcome verdicts: did the accepted action hold up against the market?
+    try {
+      const { data: outs } = await supabase
+        .from("outcomes")
+        .select("io_id,verdict")
+        .in("io_id", ioIds);
+      for (const o of (outs ?? []) as { io_id: string; verdict: IoDecision["verdict"] }[]) {
+        if (map[o.io_id]) map[o.io_id].verdict = o.verdict;
+      }
+    } catch { /* verdicts are additive - decisions render without them */ }
     return map;
   } catch {
     return {};

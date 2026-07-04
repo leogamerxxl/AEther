@@ -151,7 +151,20 @@ function Drawer({ io, onClose }: { io: IntelligenceObject; onClose: () => void }
                 </span>
                 <span className="ml-auto tabular-nums text-white/40">{fmtTs(decision.decided_at)}</span>
               </div>
-            ) : source === "live" ? (
+            ) : null}
+            {decision?.verdict ? (
+              <div className="mt-1.5 flex items-center gap-2 rounded-md border px-3 py-2 text-[12px]"
+                   style={{ borderColor: decision.verdict === "supported" ? C.moneySoft : "rgba(255,255,255,.08)" }}>
+                <span className="size-1.5 rounded-full"
+                      style={{ background: decision.verdict === "supported" ? C.money
+                        : decision.verdict === "contradicted" ? C.down : C.idle }} />
+                <span className="text-white/75">
+                  {decision.verdict === "supported" ? "Validat de piata - presiunea s-a mentinut"
+                    : decision.verdict === "contradicted" ? "Contrazis - piata s-a relaxat brusc"
+                    : "In evaluare - semnal mixt"}
+                </span>
+              </div>
+            ) : !decision && source === "live" ? (
               <div className="mt-2 flex gap-2">
                 <button
                   onClick={() => act("accepted")}

@@ -20,7 +20,7 @@ def main():
         print(f"[ontology_sync] config error: {e}", file=sys.stderr)
         return 2
     try:
-        res = sb._req("POST", "rpc/ontology_sync")
+        res = sb._req("POST", "rpc/ontology_sync_full")
         log_run(sb, "ontology_sync", "ok", {}, res or {}, started)
         print(json.dumps({"status": "ok", "result": res}, default=str))
         return 0

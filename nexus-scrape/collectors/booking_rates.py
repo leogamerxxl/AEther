@@ -142,7 +142,7 @@ def main(argv=None):
         today = utcnow().date()
         start_urls = [{"url": p["booking_url"]} for p in with_url]
         rows = []
-        for d in range(1, a.days + 1):
+        for d in range(0, a.days + 1):  # d=0: same-day (last-minute) rates - outcome validation needs tonight
             checkin = today + timedelta(days=d)
             items = run_actor(token, {
                 "startUrls": start_urls, "checkIn": checkin.isoformat(),

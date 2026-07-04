@@ -71,5 +71,9 @@ jobs:
         run: python nexus-scrape/test_signal_engine.py
       - name: Weather-signal unit tests (pure, no secrets)
         run: python nexus-scrape/test_signal_weather.py
+      - name: FX-signal unit tests (pure, no secrets)
+        run: python nexus-scrape/test_signal_fx.py
+      - name: Outcome-engine unit tests (pure, no secrets)
+        run: python nexus-scrape/test_outcome_engine.py
       - name: Brief reads-IO tests (pure, no secrets)
         run: python nexus-brief/test_brief_reads_io.py
