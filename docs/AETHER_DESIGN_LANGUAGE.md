@@ -130,3 +130,13 @@ Reduced-motion law: honored via both `prefers-reduced-motion` and the in-app set
 ## 12. Governance
 
 No new hex, no new radius, no new duration, no new glass recipe — additions amend this document first (PR must link the amendment). `/showcase` is the contract: a primitive that isn't in the showcase isn't in the language. Migration order lives in [ROADMAP](AETHER_ROADMAP.md) Phase 2.
+
+---
+## Amendment - 2026-07-04 (owner directive): gx-matte night-shade tier
+Instrument panels (rail, chrome, variance, pulse, controls, drawer) use the new
+gx-matte tier: near-opaque night surface (rgba 16-9 gradient at .94-.96), blur 14,
+hairline border, NO iridescent edges. Rationale: readability over any basemap;
+the world glows, the instruments do not. gx-glass/gx-bento remain for in-world
+accent surfaces only. Zoning rule: one left column (menu - title - rail); map
+center stays instrument-free; bottom-right = reading stack (pulse + variance) +
+camera controls; drawer above all chrome (z 88/90).

@@ -51,7 +51,7 @@ export default function IOContextDrawer({ io, onClose }: { io: IntelligenceObjec
       {io ? (
         <>
           <motion.div
-            className="fixed inset-0 z-40 bg-black/55"
+            className="fixed inset-0 z-[88] bg-black/60"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -59,7 +59,7 @@ export default function IOContextDrawer({ io, onClose }: { io: IntelligenceObjec
             onClick={onClose}
           />
           <motion.aside
-            className="gx-bento fixed right-0 top-0 z-50 flex h-[100dvh] w-full max-w-[440px] flex-col gap-4 overflow-y-auto p-5"
+            className="gx gx-matte fixed right-0 top-0 z-[90] flex h-[100dvh] w-full max-w-[440px] flex-col gap-4 overflow-y-auto rounded-none p-5"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}

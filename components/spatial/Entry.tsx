@@ -108,8 +108,10 @@ export default function Entry() {
           <CommandRail band={band} onFlyTo={flyTo} focusId={focusId} />
           <WorldChrome band={band} focusName={focusId ? NODE_BY_ID.get(focusId)?.name : null} onFlyTo={flyTo} />
           <WorldControls zoomBy={(d) => camRef.current?.zoomBy(d)} home={() => camRef.current?.home()} />
-          {band === "market" || band === "region" ? <VarianceBoard /> : null}
-          {band === "market" ? <MapPulseChip /> : null}
+          <div className="fixed bottom-4 right-16 z-[78] hidden flex-col items-end gap-2 lg:flex">
+            {band === "market" ? <MapPulseChip /> : null}
+            {band === "market" || band === "region" ? <VarianceBoard /> : null}
+          </div>
         </>
       ) : null}
 

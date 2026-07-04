@@ -23,7 +23,7 @@ export default function MapPulseChip() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={TRANSITION.standard}
-      className="gx gx-bento pointer-events-none fixed right-[22%] top-[34%] z-[72] hidden rounded-[20px] px-4 py-3 lg:block"
+      className="gx gx-matte pointer-events-none rounded-[20px] px-4 py-3"
     >
       <div className="text-[10px] uppercase tracking-[.12em] text-white/40">Compresie diseara</div>
       <div className="mt-0.5 flex items-baseline gap-1">

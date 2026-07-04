@@ -28,7 +28,7 @@ export default function VarianceBoard() {
   const avg = Math.round(comps.reduce((s, c) => s + Math.abs(c.delta), 0) / comps.length);
 
   return (
-    <div className="gx gx-bento fixed bottom-4 right-16 z-[78] hidden w-[300px] flex-col rounded-[20px] p-3 lg:flex">
+    <div className="gx gx-matte flex w-[300px] flex-col rounded-[20px] p-3">
       <div className="flex items-baseline justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-white/40">Variatie tarife</span>
         <span className="num text-[16px] font-light text-white/85">± {ron.format(avg)} <span className="text-[10px] text-white/40">RON fata de median</span></span>

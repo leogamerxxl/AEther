@@ -127,7 +127,7 @@ export default function CommandRail({ band, onFlyTo, focusId }: {
   if (!open) {
     return (
       <button onClick={() => setOpen(true)} aria-label="Deschide panoul de comanda"
-        className="gx gx-bento fixed left-4 top-20 z-[80] hidden items-center gap-2 rounded-full px-3 py-2 lg:flex">
+        className="gx gx-matte fixed left-4 top-[124px] z-[80] hidden items-center gap-2 rounded-full px-3 py-2 lg:flex">
         <span className={source === "live" ? "size-2 animate-pulse rounded-full" : "size-2 rounded-full"}
               style={{ background: source === "live" ? C.live : C.idle }} />
         {topRec ? <span className="size-2 rounded-full" style={{ background: C.money }} /> : null}
@@ -142,7 +142,7 @@ export default function CommandRail({ band, onFlyTo, focusId }: {
         initial={{ opacity: 0, x: -12 }}
         animate={{ opacity: 1, x: 0 }}
         transition={TRANSITION.standard}
-        className="gx gx-glass fixed left-4 top-20 z-[80] hidden max-h-[calc(100dvh-6rem)] w-[380px] flex-col gap-3 overflow-y-auto rounded-[26px] p-4 lg:flex"
+        className="gx gx-matte fixed left-4 top-[124px] z-[80] hidden max-h-[calc(100dvh-8.75rem)] w-[380px] flex-col gap-3 overflow-y-auto rounded-[26px] p-4 lg:flex"
         aria-label="Panou de comanda"
       >
         <div className="flex items-center justify-between gap-2">

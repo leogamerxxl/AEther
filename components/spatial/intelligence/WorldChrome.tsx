@@ -29,7 +29,7 @@ export default function WorldChrome({ band, focusName, onFlyTo }: {
   return (
     <>
       {/* Pill navigation - the altitude bands as sections */}
-      <div className="gx gx-bento fixed left-1/2 top-4 z-[82] hidden -translate-x-1/2 items-center gap-1 rounded-full p-1 lg:flex">
+      <div className="gx gx-matte fixed left-1/2 top-4 z-[82] hidden -translate-x-1/2 items-center gap-1 rounded-full p-1 lg:flex">
         {BANDS.map((b) => {
           const active = b.id === band;
           return (
@@ -63,10 +63,10 @@ export default function WorldChrome({ band, focusName, onFlyTo }: {
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={TRANSITION.standard}
-        className="pointer-events-none fixed left-[400px] top-16 z-[70] hidden lg:block"
+        className="pointer-events-none fixed left-5 top-[64px] z-[81] hidden w-[360px] lg:block"
       >
-        <h1 className="large-title text-white/90" style={{ fontSize: 44 }}>{title}</h1>
-        <div className="mt-1 text-[11px] uppercase tracking-[.16em] text-white/35">{meta.trail}</div>
+        <h1 className="large-title text-white/95" style={{ fontSize: 32 }}>{title}</h1>
+        <div className="mt-0.5 text-[10px] uppercase tracking-[.16em] text-white/40">{meta.trail}</div>
       </motion.div>
     </>
   );
