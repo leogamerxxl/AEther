@@ -8,6 +8,7 @@ import { getSession, signOut, type Session } from "@/lib/auth";
 import { ROLES } from "@/lib/ops";
 import CoastalCommandCenter from "./CoastalCommandCenter";
 import StaffFeed from "./StaffFeed";
+import TwinOverlay from "./TwinOverlay";
 import { SpatialIntelligenceProvider } from "./intelligence/SpatialIntelligenceProvider";
 import CommandRail from "./intelligence/CommandRail";
 import AppBar from "./intelligence/AppBar";
@@ -113,8 +114,14 @@ export default function Entry() {
         <>
           {mode === "map" ? (
             <>
-              <CommandRail band={band} onFlyTo={flyTo} focusId={focusId} onPick={setSelectedIo} />
-              <RightFeed onPick={setSelectedIo} />
+              {band === "twin" ? (
+                <TwinOverlay />
+              ) : (
+                <>
+                  <CommandRail band={band} onFlyTo={flyTo} focusId={focusId} onPick={setSelectedIo} />
+                  <RightFeed onPick={setSelectedIo} />
+                </>
+              )}
               {band === "market" ? <PressureTimeline onPick={setSelectedIo} /> : null}
               <AltitudeRail band={band} onFlyTo={flyTo} />
               <WorldControls zoomBy={(d) => camRef.current?.zoomBy(d)} home={() => camRef.current?.home()} toggle3D={() => camRef.current?.toggle3D()} />

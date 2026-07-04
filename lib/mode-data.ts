@@ -188,3 +188,24 @@ export async function fetchDecisionLedger(): Promise<DecisionEntry[]> {
   });
 }
 export const useDecisionLedger = () => useLoadable(fetchDecisionLedger, [] as DecisionEntry[]);
+// ---------------- Twin: otb_observations (hotel-level truth) ----------------
+
+export interface OtbToday {
+  stay_date: string;
+  rooms_sold: number | null;
+  rooms_remaining: number | null;
+  adr: number | null;
+}
+
+export async function fetchOtbToday(): Promise<OtbToday | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("otb_observations")
+    .select("stay_date,rooms_sold,rooms_remaining,adr")
+    .eq("stay_date", today)
+    .order("observed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as OtbToday | null) ?? null;
+}
