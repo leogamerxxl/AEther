@@ -17,6 +17,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { C } from "@/lib/command-theme";
+import { ioFreshness, type IntelligenceObject } from "@/lib/intelligence-map";
 import { AnimatePresence } from "framer-motion";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -24,7 +26,7 @@ import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
 import { deriveIntel } from "@/lib/spatial-intel";
 import type { PropertyIntelligenceNode } from "@/types/spatial";
 import { HoverChip } from "./MapCards";
-import { buildPropertyExtrusions, buildPropertyGlowPoints } from "@/lib/property-extrusions";
+import { buildPropertyExtrusions, buildPropertyGlowPoints, PACE_COLORS, lightenHex } from "@/lib/property-extrusions";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
@@ -33,7 +35,7 @@ const CENTER: [number, number] = [28.596282, 43.869390];
 
 // ─── CoastalCommandCenter ────────────────────────────────────────────────────
 
-export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, onCamera, registerFlyTo, registerCamera, onFocus }: { cinematic?: boolean; start?: boolean; locked?: boolean; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (zoom: number) => void) => void; registerCamera?: (ops: { zoomBy: (d: number) => void; home: () => void }) => void; onFocus?: (id: string | null) => void } = {}) {
+export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, onCamera, registerFlyTo, registerCamera, onFocus, onPickIo }: { cinematic?: boolean; start?: boolean; locked?: boolean; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (zoom: number) => void) => void; registerCamera?: (ops: { zoomBy: (d: number) => void; home: () => void }) => void; onFocus?: (id: string | null) => void; onPickIo?: (io: IntelligenceObject) => void } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<mapboxgl.Map | null>(null);
   const markersRef   = useRef<mapboxgl.Marker[]>([]);
@@ -53,10 +55,42 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
   // Single read layer: nodes (sample scaffold overlaid with live IO insight) come
   // from the one provider - never a direct NODES import. A ref keeps map event
   // handlers (bound once) resolving against the latest live nodes.
-  const { nodes, source } = useIntelligence();
+  const { nodes, source, objects, decisions } = useIntelligence();
   const nodesRef = useRef(nodes);
   nodesRef.current = nodes;
   const HOME = useMemo(() => nodes.find(n => n.name === "Hotel Terra Neptun") ?? nodes[0], [nodes]);
+
+  // The world layer reads the REAL market IO: tonight's per-comp availability is
+  // painted onto the buildings (feature-state), and the actionable nights become
+  // a scene-anchored harbor pin. No new fetch - the one provider feeds the map.
+  const marketIos = useMemo(() => objects
+    .filter(io => io.signal_type === "market_rate_pressure" && ioFreshness(io) !== "dead")
+    .sort((a, b) => String(a.raw_jsonb?.stay_date).localeCompare(String(b.raw_jsonb?.stay_date))), [objects]);
+  const latestMarket = marketIos[0];
+  const actionable = useMemo(() => marketIos
+    .filter(io => (io.recommended_actions ?? []).length > 0 && !decisions[io.id]), [marketIos, decisions]);
+  const liveStates = useMemo(() => {
+    const comps = ((latestMarket?.raw_jsonb as Record<string, unknown> | undefined)?.comps ?? []) as
+      { name?: string | null; availability_state?: string | null }[];
+    const STOP = new Set(["hotel", "resort", "and", "spa", "the"]);
+    const words = (s: string) => new Set(s.toLowerCase().normalize("NFD").replace(/[^a-z0-9 ]/g, " ")
+      .split(/\s+/).filter(w => w.length > 2 && !STOP.has(w)));
+    const out: { id: string; sold: boolean }[] = [];
+    for (const cp of comps) {
+      if (!cp.name) continue;
+      const cw = words(cp.name);
+      let best: { id: string; score: number } | null = null;
+      for (const n of nodes) {
+        if (n.isOwn) continue;
+        const nw = words(n.name ?? "");
+        let score = 0;
+        cw.forEach(w => { if (nw.has(w)) score++; });
+        if (score > 0 && (!best || score > best.score)) best = { id: n.id, score };
+      }
+      if (best) out.push({ id: best.id, sold: cp.availability_state === "sold_out" });
+    }
+    return out;
+  }, [latestMarket, nodes]);
 
   const [hoveredId,  setHoveredId]  = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -178,7 +212,12 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
       const glowLayer = {
         id: GLOW, type: "circle", source: GLOW_SRC, slot: "middle",
         paint: {
-          "circle-color": ["get", "color"],
+          "circle-color": [
+            "case",
+            ["boolean", ["feature-state", "sold"], false], PACE_COLORS.balanced,
+            ["boolean", ["feature-state", "avail"], false], C.live,
+            ["get", "color"],
+          ],
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 5, 14, 22, 16, 48, 18, 90],
           "circle-blur": 1,
           "circle-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0.10, 15, 0.26],
@@ -201,7 +240,12 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
         source: SRC,
         slot: "middle",
         paint: {
-          "fill-extrusion-color": ["get", "lit"],
+          "fill-extrusion-color": [
+            "case",
+            ["boolean", ["feature-state", "sold"], false], PACE_COLORS.balanced,
+            ["boolean", ["feature-state", "avail"], false], lightenHex(C.live, 0.4),
+            ["get", "lit"],
+          ],
           "fill-extrusion-height": [
             "+",
             ["get", "height"],
@@ -211,7 +255,11 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
           "fill-extrusion-vertical-gradient": true,
           "fill-extrusion-opacity": 0.55,
           "fill-extrusion-emissive-strength": [
-            "case", ["boolean", ["feature-state", "hover"], false], 1, 0.85,
+            "case",
+            ["boolean", ["feature-state", "hover"], false], 1,
+            ["boolean", ["feature-state", "sold"], false], 0.28,
+            ["boolean", ["feature-state", "avail"], false], 1,
+            0.85,
           ],
         },
       } as unknown as AddLayer;
@@ -259,6 +307,17 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
+  // ── World layer live-state: paint tonight's availability onto the buildings ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || liveStates.length === 0) return;
+    for (const s of liveStates) {
+      try {
+        map.setFeatureState({ source: "aether-properties", id: s.id }, { sold: s.sold, avail: !s.sold });
+      } catch { /* layer may be mid-teardown */ }
+    }
+  }, [ready, liveStates]);
+
   // ── Initial flyTo to Hotel Terra on boot ─────────────────────────────────
   useEffect(() => {
     if (!ready || bootedRef.current || !HOME) return;
@@ -285,6 +344,18 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
   const project  = (n: PropertyIntelligenceNode) => map && ready ? map.project(n.coordinates) : null;
   const hovered  = hoveredId  ? nodes.find(n => n.id === hoveredId)  ?? null : null;
   const hp       = hovered && hovered.id !== selectedId ? project(hovered) : null;
+  const zoomNow  = map && ready ? map.getZoom() : 0;
+  const marketCentroid = useMemo<[number, number] | null>(() => {
+    const comps = nodes.filter(n => !n.isOwn);
+    if (comps.length === 0) return null;
+    return [
+      comps.reduce((s, n) => s + n.coordinates[0], 0) / comps.length,
+      comps.reduce((s, n) => s + n.coordinates[1], 0) / comps.length,
+    ];
+  }, [nodes]);
+  const topRec = actionable[0] ?? null;
+  const pinP = topRec && marketCentroid && zoomNow >= 10.5 && zoomNow < 14 && map && ready
+    ? map.project(marketCentroid) : null;
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -309,6 +380,27 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
             <HoverChip key={hovered.id} node={hovered} x={hp.x} y={hp.y} />
           ) : null}
         </AnimatePresence>
+
+        {/* Scene-anchored action pin: the actionable nights, ON the world (harbor) */}
+        {!locked && pinP && topRec ? (
+          <button
+            onClick={() => onPickIo?.(topRec)}
+            className="absolute z-20 -translate-x-1/2 -translate-y-full cursor-pointer"
+            style={{ left: pinP.x, top: pinP.y }}
+            aria-label="Deschide actiunea de piata"
+          >
+            <span className="gx gx-matte flex items-center gap-2 rounded-full py-1.5 pl-2 pr-3">
+              <span className="relative flex size-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: C.money }} />
+                <span className="relative inline-flex size-2.5 rounded-full" style={{ background: C.money }} />
+              </span>
+              <span className="text-[10.5px] font-medium text-white/90">
+                {actionable.length} {actionable.length === 1 ? "noapte actionabila" : "nopti actionabile"}
+              </span>
+            </span>
+            <span className="mx-auto block h-3 w-px" style={{ background: C.money, opacity: 0.7 }} />
+          </button>
+        ) : null}
 
         {/* <AssetTwin> set aside for now (perf) */}
 

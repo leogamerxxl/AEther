@@ -101,7 +101,7 @@ export default function Entry() {
       {hydrated && isStaff ? (
         <StaffFeed role={role!} />
       ) : (
-        <CoastalCommandCenter cinematic start={revealed} locked={!session} onCamera={setZoom} registerFlyTo={(fn) => { flyRef.current = fn; }} registerCamera={(ops) => { camRef.current = ops; }} onFocus={setFocusId} />
+        <CoastalCommandCenter cinematic start={revealed} locked={!session} onCamera={setZoom} registerFlyTo={(fn) => { flyRef.current = fn; }} registerCamera={(ops) => { camRef.current = ops; }} onFocus={setFocusId} onPickIo={setSelectedIo} />
       )}
 
       {/* The map's operating rail - authenticated command surface (desktop) */}
