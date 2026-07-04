@@ -10,7 +10,8 @@ import CoastalCommandCenter from "./CoastalCommandCenter";
 import StaffFeed from "./StaffFeed";
 import { SpatialIntelligenceProvider } from "./intelligence/SpatialIntelligenceProvider";
 import CommandRail from "./intelligence/CommandRail";
-import WorldChrome from "./intelligence/WorldChrome";
+import AppBar from "./intelligence/AppBar";
+import AltitudeRail from "./intelligence/AltitudeRail";
 import WorldControls from "./intelligence/WorldControls";
 import RightFeed from "./intelligence/RightFeed";
 import PressureTimeline from "./intelligence/PressureTimeline";
@@ -18,7 +19,7 @@ import IOContextDrawer from "./intelligence/IOContextDrawer";
 import ModeHost from "./modes/ModeHost";
 import { type WorldMode } from "@/lib/mode-data";
 import type { IntelligenceObject } from "@/lib/intelligence-map";
-import { bandForZoom } from "@/lib/altitude";
+import { bandForZoom, type AltitudeBand } from "@/lib/altitude";
 import AuthGate from "./AuthGate";
 import { Toaster } from "./Toast";
 import { toast } from "@/lib/toast";
@@ -40,13 +41,13 @@ export default function Entry() {
   const [verifying, setVerifying] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [selectedIo, setSelectedIo] = useState<IntelligenceObject | null>(null);
-  const camRef = useRef<{ zoomBy: (d: number) => void; home: () => void } | null>(null);
+  const camRef = useRef<{ zoomBy: (d: number) => void; home: () => void; toggle3D: () => void } | null>(null);
   const [settings, setSettings] = useState<{ open: boolean; section: SettingsSection }>({ open: false, section: "profile" });
   const [zoom, setZoom] = useState(14.2);
   const [mode, setMode] = useState<WorldMode>("map");
-  const flyRef = useRef<((zoom: number) => void) | null>(null);
+  const flyRef = useRef<((band: AltitudeBand) => void) | null>(null);
   const band = bandForZoom(zoom);
-  const flyTo = (z: number) => flyRef.current?.(z);
+  const flyTo = (b: AltitudeBand) => flyRef.current?.(b);
   const openSettings = (section: SettingsSection) => setSettings({ open: true, section });
 
   useEffect(() => {
@@ -115,19 +116,20 @@ export default function Entry() {
               <CommandRail band={band} onFlyTo={flyTo} focusId={focusId} onPick={setSelectedIo} />
               <RightFeed onPick={setSelectedIo} />
               {band === "market" ? <PressureTimeline onPick={setSelectedIo} /> : null}
-              <WorldControls zoomBy={(d) => camRef.current?.zoomBy(d)} home={() => camRef.current?.home()} />
+              <AltitudeRail band={band} onFlyTo={flyTo} />
+              <WorldControls zoomBy={(d) => camRef.current?.zoomBy(d)} home={() => camRef.current?.home()} toggle3D={() => camRef.current?.toggle3D()} />
             </>
           ) : (
             <ModeHost mode={mode} onPick={setSelectedIo} onClose={() => setMode("map")} />
           )}
-          <WorldChrome band={band} onFlyTo={flyTo} mode={mode} onMode={setMode} />
+          <AppBar mode={mode} onMode={setMode} />
           <IOContextDrawer io={selectedIo} onClose={() => setSelectedIo(null)} />
         </>
       ) : null}
 
       {/* Owner/Manager: the Aether logo menu replaces the old status bar (top-left) */}
       {hydrated && session && !isStaff && menuUser ? (
-        <div className="fixed left-4 top-4 z-[85]">
+        <div className="fixed left-3 top-1.5 z-[85]">
           <AetherMenu user={menuUser} sections={sections} onSignOut={onSignOut} featured={{ title: "Hotel Terra Neptun", subtitle: "Pilot plan - Black Sea coast", icon: <MapPin className="size-5" />, onClick: () => soon("Workspace") }} />
         </div>
       ) : null}

@@ -18,6 +18,8 @@ import { AnimatePresence } from "framer-motion";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
+import { buildCoastalZones, buildZoneLabels } from "@/lib/coastal-zones";
+import { bandMeta, type AltitudeBand } from "@/lib/altitude";
 import { deriveIntel } from "@/lib/spatial-intel";
 import type { PropertyIntelligenceNode } from "@/types/spatial";
 import AssetDashboard from "./AssetDashboard";
@@ -32,7 +34,7 @@ const CENTER: [number, number] = [28.596282, 43.869390];
 
 // ─── CoastalCommandCenter ────────────────────────────────────────────────────
 
-export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, onCamera, registerFlyTo, registerCamera, onFocus, onPickIo }: { cinematic?: boolean; start?: boolean; locked?: boolean; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (zoom: number) => void) => void; registerCamera?: (ops: { zoomBy: (d: number) => void; home: () => void }) => void; onFocus?: (id: string | null) => void; onPickIo?: (io: IntelligenceObject) => void } = {}) {
+export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, onCamera, registerFlyTo, registerCamera, onFocus, onPickIo }: { cinematic?: boolean; start?: boolean; locked?: boolean; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (band: AltitudeBand) => void) => void; registerCamera?: (ops: { zoomBy: (d: number) => void; home: () => void; toggle3D: () => void }) => void; onFocus?: (id: string | null) => void; onPickIo?: (io: IntelligenceObject) => void } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<mapboxgl.Map | null>(null);
   const markersRef   = useRef<mapboxgl.Marker[]>([]);
@@ -139,14 +141,12 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
     });
     mapRef.current = map;
 
-    map.addControl(
-      new mapboxgl.NavigationControl({ visualizePitch: true }),
-      "bottom-right"
-    );
-
     // v3 Standard style config: night preset + clean POI
     map.on("style.load", () => {
-      try { map.setConfigProperty("basemap", "lightPreset", "night"); }           catch { /* noop */ }
+      // Real time of day: the world is lit like the coast is lit right now
+      const h = new Date().getHours();
+      const preset = h < 5 ? "night" : h < 8 ? "dawn" : h < 18 ? "day" : h < 21 ? "dusk" : "night";
+      try { map.setConfigProperty("basemap", "lightPreset", preset); }              catch { /* noop */ }
       try { map.setConfigProperty("basemap", "showPointOfInterestLabels", false); } catch { /* noop */ }
       try { map.setConfigProperty("basemap", "showTransitLabels", false); }       catch { /* noop */ }
       // Real-building highlight colors (Standard featureset states)
@@ -158,11 +158,19 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
     map.on("load", () => {
       setReady(true);
       try { onCameraRef.current?.(map.getZoom()); } catch { /* noop */ }
-      registerFlyToRef.current?.((zoom: number) => {
-        try { map.flyTo({ zoom, duration: 1600, essential: true }); } catch { /* noop */ }
+      registerFlyToRef.current?.((band: AltitudeBand) => {
+        try {
+          const m = bandMeta(band);
+          map.flyTo({
+            zoom: m.zoomTarget, pitch: m.pitch, bearing: m.bearing,
+            center: m.center ?? HOME?.coordinates ?? CENTER,
+            duration: 2200, essential: true,
+          });
+        } catch { /* noop */ }
       });
       registerCameraRef.current?.({
         zoomBy: (d: number) => { try { map.easeTo({ zoom: map.getZoom() + d, duration: 400 }); } catch { /* noop */ } },
+        toggle3D: () => { try { map.easeTo({ pitch: map.getPitch() > 25 ? 0 : 62, duration: 600 }); } catch { /* noop */ } },
         home: () => {
           try {
             map.flyTo({ center: HOME?.coordinates ?? CENTER, zoom: 15.6, pitch: 62, bearing: -20, duration: 2000, essential: true });
@@ -195,6 +203,58 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
     };
   }, []);
 
+  // ── Region zones: the coastal market as extruded slabs (region altitude) ──
+  // Heights from real IOs (live zone rises with tonight's compression); zones
+  // without collectors stay low + neutral. Fades in leaving country, out
+  // entering market - the region band's world treatment.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    type AddLayer = Parameters<typeof map.addLayer>[0];
+    const SRC = "aether-zones-src", FILL = "aether-zones";
+    const LBL_SRC = "aether-zone-labels-src", LBL = "aether-zone-labels";
+    const zones = buildCoastalZones(objects);
+    const labels = buildZoneLabels(objects);
+    if (!map.getSource(SRC)) map.addSource(SRC, { type: "geojson", data: zones });
+    else (map.getSource(SRC) as mapboxgl.GeoJSONSource).setData(zones);
+    if (!map.getSource(LBL_SRC)) map.addSource(LBL_SRC, { type: "geojson", data: labels });
+    else (map.getSource(LBL_SRC) as mapboxgl.GeoJSONSource).setData(labels);
+    if (!map.getLayer(FILL)) {
+      try {
+        map.addLayer({
+          id: FILL, type: "fill-extrusion", source: SRC, slot: "middle",
+          minzoom: 6, maxzoom: 12,
+          paint: {
+            "fill-extrusion-height": ["get", "height"],
+            "fill-extrusion-base": 0,
+            "fill-extrusion-color": ["get", "color"],
+            "fill-extrusion-opacity": 0.3,
+            "fill-extrusion-emissive-strength": 0.85,
+          },
+        } as unknown as AddLayer);
+      } catch { /* noop */ }
+    }
+    if (!map.getLayer(LBL)) {
+      try {
+        map.addLayer({
+          id: LBL, type: "symbol", source: LBL_SRC, slot: "top",
+          minzoom: 6.6, maxzoom: 11.4,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-size": 12.5,
+            "text-letter-spacing": 0.04,
+            "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+          },
+          paint: {
+            "text-color": "rgba(255,255,255,.68)",
+            "text-halo-color": "rgba(5,6,8,.9)",
+            "text-halo-width": 1.2,
+            "text-opacity": ["interpolate", ["linear"], ["zoom"], 6.6, 0, 7.4, 1, 10.6, 1, 11.4, 0],
+          },
+        } as unknown as AddLayer);
+      } catch { /* noop */ }
+    }
+  }, [ready, objects]);
   // ── Ground halo layer: always-visible state color + THE interaction surface ──
   // The real building shapes are highlighted separately (featureset effect below);
   // no synthetic towers on top of the world.

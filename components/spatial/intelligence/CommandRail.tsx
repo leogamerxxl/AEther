@@ -56,7 +56,7 @@ function Spark({ market, decisions }: { market: IntelligenceObject[]; decisions:
 }
 
 export default function CommandRail({ band, onFlyTo, focusId, onPick }: {
-  band: AltitudeBand; onFlyTo?: (zoom: number) => void; focusId?: string | null;
+  band: AltitudeBand; onFlyTo?: (band: AltitudeBand) => void; focusId?: string | null;
   onPick: (io: IntelligenceObject) => void;
 }) {
   const { source, objects, loading, decisions, nodes } = useIntelligence();
@@ -124,7 +124,7 @@ export default function CommandRail({ band, onFlyTo, focusId, onPick }: {
               <div className="flex justify-between"><span>Trafic</span><span className="text-white/30">in plan</span></div>
             </div>
           </Card>
-          <button onClick={() => onFlyTo?.(12)} className="gx gx-matte rounded-[14px] p-2.5 text-left text-[11px] text-white/85 transition-opacity hover:opacity-90" style={{ background: C.moneySoft }}>
+          <button onClick={() => onFlyTo?.("market")} className="gx gx-matte rounded-[14px] p-2.5 text-left text-[11px] text-white/85 transition-opacity hover:opacity-90" style={{ background: C.moneySoft }}>
             Coboara la piata -&gt;
           </button>
         </>
@@ -209,7 +209,7 @@ export default function CommandRail({ band, onFlyTo, focusId, onPick }: {
             </div>
             {focus?.insight?.observedContext ? <div className="mt-1.5 line-clamp-3 text-[10px] leading-snug text-white/40">{focus.insight.observedContext}</div> : null}
           </Card>
-          <button onClick={() => onFlyTo?.(17.4)} className="gx gx-matte rounded-[14px] p-2.5 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[.04]">
+          <button onClick={() => onFlyTo?.("twin")} className="gx gx-matte rounded-[14px] p-2.5 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[.04]">
             Coboara in interior (twin) -&gt;
           </button>
         </>
