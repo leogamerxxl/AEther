@@ -15,6 +15,8 @@ import WorldControls from "./intelligence/WorldControls";
 import RightFeed from "./intelligence/RightFeed";
 import PressureTimeline from "./intelligence/PressureTimeline";
 import IOContextDrawer from "./intelligence/IOContextDrawer";
+import ModeHost from "./modes/ModeHost";
+import { type WorldMode } from "@/lib/mode-data";
 import type { IntelligenceObject } from "@/lib/intelligence-map";
 import { bandForZoom } from "@/lib/altitude";
 import AuthGate from "./AuthGate";
@@ -41,6 +43,7 @@ export default function Entry() {
   const camRef = useRef<{ zoomBy: (d: number) => void; home: () => void } | null>(null);
   const [settings, setSettings] = useState<{ open: boolean; section: SettingsSection }>({ open: false, section: "profile" });
   const [zoom, setZoom] = useState(14.2);
+  const [mode, setMode] = useState<WorldMode>("map");
   const flyRef = useRef<((zoom: number) => void) | null>(null);
   const band = bandForZoom(zoom);
   const flyTo = (z: number) => flyRef.current?.(z);
@@ -107,11 +110,17 @@ export default function Entry() {
       {/* The map's operating rail - authenticated command surface (desktop) */}
       {hydrated && session && !isStaff ? (
         <>
-          <CommandRail band={band} onFlyTo={flyTo} focusId={focusId} onPick={setSelectedIo} />
-          <RightFeed onPick={setSelectedIo} />
-          {band === "market" ? <PressureTimeline onPick={setSelectedIo} /> : null}
-          <WorldChrome band={band} onFlyTo={flyTo} />
-          <WorldControls zoomBy={(d) => camRef.current?.zoomBy(d)} home={() => camRef.current?.home()} />
+          {mode === "map" ? (
+            <>
+              <CommandRail band={band} onFlyTo={flyTo} focusId={focusId} onPick={setSelectedIo} />
+              <RightFeed onPick={setSelectedIo} />
+              {band === "market" ? <PressureTimeline onPick={setSelectedIo} /> : null}
+              <WorldControls zoomBy={(d) => camRef.current?.zoomBy(d)} home={() => camRef.current?.home()} />
+            </>
+          ) : (
+            <ModeHost mode={mode} onPick={setSelectedIo} onClose={() => setMode("map")} />
+          )}
+          <WorldChrome band={band} onFlyTo={flyTo} mode={mode} onMode={setMode} />
           <IOContextDrawer io={selectedIo} onClose={() => setSelectedIo(null)} />
         </>
       ) : null}

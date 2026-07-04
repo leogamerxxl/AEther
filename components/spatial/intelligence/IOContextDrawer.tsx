@@ -13,6 +13,7 @@ import { useIntelligence } from "./SpatialIntelligenceProvider";
 import { toast } from "@/lib/toast";
 import { SPRING, TRANSITION } from "@/lib/motion";
 import { ioFreshness, evidenceCount, type IntelligenceObject, type Freshness } from "@/lib/intelligence-map";
+import { signalLabel } from "@/lib/mode-data";
 
 const FRESH_COLOR: Record<Freshness, string> = {
   fresh: C.live,
@@ -99,7 +100,7 @@ function Drawer({ io, onClose }: { io: IntelligenceObject; onClose: () => void }
         <div>
           <div className="flex items-center gap-2">
             <span className="size-2 rounded-full" style={{ background: sev, boxShadow: `0 0 8px ${sev}` }} />
-            <span className="text-[16px] font-semibold text-white">{io.signal_type}</span>
+            <span className="text-[16px] font-semibold text-white">{signalLabel(io.signal_type)}</span>
           </div>
           <div className="mt-1 text-[11px] uppercase tracking-[.1em] text-white/40">
             {io.altitude_level} / {io.entity_type} / {io.severity}
@@ -223,6 +224,7 @@ function Drawer({ io, onClose }: { io: IntelligenceObject; onClose: () => void }
           <Row label="Observed">{fmtTs(io.observed_at)}</Row>
           <Row label="Expires">{fmtTs(io.expires_at)}</Row>
           <Row label="Anchor">{io.visual_anchor?.label ?? io.visual_anchor?.property_id ?? "-"}</Row>
+          <Row label="Signal type"><span className="font-mono">{io.signal_type}</span></Row>
           <Row label="Entity">{io.entity_id ?? "-"}</Row>
         </div>
       </div>
