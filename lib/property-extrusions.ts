@@ -87,12 +87,13 @@ export function buildPropertyExtrusions(): FeatureCollection<Polygon, ExtrusionP
 }
 
 /** Centroid points for the soft luminescent ground-glow halo under each asset. */
-export function buildPropertyGlowPoints(): FeatureCollection<import("geojson").Point, { color: string; isOwn: boolean }> {
+export function buildPropertyGlowPoints(): FeatureCollection<import("geojson").Point, { id: string; name: string; color: string; isOwn: boolean }> {
   return {
     type: "FeatureCollection",
     features: NODES.map((n) => ({
       type: "Feature" as const,
-      properties: { color: paceColor(n), isOwn: n.isOwn },
+      id: n.id, // enables feature-state + hit-testing on the halo layer
+      properties: { id: n.id, name: n.name, color: paceColor(n), isOwn: n.isOwn },
       geometry: { type: "Point" as const, coordinates: [n.coordinates[0], n.coordinates[1]] },
     })),
   };
