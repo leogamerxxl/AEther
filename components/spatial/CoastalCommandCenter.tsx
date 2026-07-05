@@ -18,8 +18,8 @@ import { AnimatePresence } from "framer-motion";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
-import { buildCoastalZones, buildZoneLabels } from "@/lib/coastal-zones";
-import { bandMeta, type AltitudeBand } from "@/lib/altitude";
+import { buildCoastalZones, buildZoneLabels, ZONE_IDS } from "@/lib/coastal-zones";
+import { bandMeta, bandForZoom, type AltitudeBand } from "@/lib/altitude";
 import { createResortLayer, RESORT_LAYER_ID, RESORT_MIN_ZOOM } from "@/lib/world/resort-scene";
 import { deriveIntel } from "@/lib/spatial-intel";
 import type { PropertyIntelligenceNode } from "@/types/spatial";
@@ -228,7 +228,7 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
     const LBL_SRC = "aether-zone-labels-src", LBL = "aether-zone-labels";
     const zones = buildCoastalZones(objects);
     const labels = buildZoneLabels(objects);
-    if (!map.getSource(SRC)) map.addSource(SRC, { type: "geojson", data: zones });
+    if (!map.getSource(SRC)) map.addSource(SRC, { type: "geojson", data: zones, promoteId: "id" });
     else (map.getSource(SRC) as mapboxgl.GeoJSONSource).setData(zones);
     if (!map.getSource(LBL_SRC)) map.addSource(LBL_SRC, { type: "geojson", data: labels });
     else (map.getSource(LBL_SRC) as mapboxgl.GeoJSONSource).setData(labels);
@@ -238,10 +238,11 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
           id: FILL, type: "fill-extrusion", source: SRC, slot: "middle",
           minzoom: 6, maxzoom: 12,
           paint: {
-            "fill-extrusion-height": ["get", "height"],
+            // grows 0 -> 1 as the region band is entered (the reference rise)
+            "fill-extrusion-height": ["*", ["get", "height"], ["coalesce", ["feature-state", "grow"], 0]],
             "fill-extrusion-base": 0,
             "fill-extrusion-color": ["get", "color"],
-            "fill-extrusion-opacity": 0.3,
+            "fill-extrusion-opacity": ["interpolate", ["linear"], ["zoom"], 6.4, 0, 7.2, 0.3, 10.6, 0.3, 11.8, 0],
             "fill-extrusion-emissive-strength": 0.85,
           },
         } as unknown as AddLayer);
@@ -267,6 +268,32 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
         } as unknown as AddLayer);
       } catch { /* noop */ }
     }
+    // Rise / settle animation on band boundaries (the reference appear-motion)
+    const ease = (k: number) => 1 - Math.pow(1 - k, 3);
+    let growRaf = 0;
+    const growTo = (from: number, to: number) => {
+      const t0 = performance.now(), D = 800;
+      const step = (now: number) => {
+        const k = Math.min(1, (now - t0) / D);
+        const v = from + (to - from) * ease(k);
+        for (const id of ZONE_IDS) {
+          try { map.setFeatureState({ source: SRC, id }, { grow: v }); } catch { /* noop */ }
+        }
+        if (k < 1) growRaf = requestAnimationFrame(step);
+      };
+      cancelAnimationFrame(growRaf);
+      growRaf = requestAnimationFrame(step);
+    };
+    let inRegion = false;
+    const onZoomGrow = () => {
+      const now = bandForZoom(map.getZoom()) === "region";
+      if (now === inRegion) return;
+      inRegion = now;
+      growTo(now ? 0 : 1, now ? 1 : 0);
+    };
+    map.on("zoom", onZoomGrow);
+    onZoomGrow();
+    return () => { map.off("zoom", onZoomGrow); cancelAnimationFrame(growRaf); };
   }, [ready, objects]);
   // ── Ground halo layer: always-visible state color + THE interaction surface ──
   // The real building shapes are highlighted separately (featureset effect below);
