@@ -101,6 +101,8 @@ const registerCameraRef = useRef(registerCamera);
   const medianTonight = ((latestMarket?.raw_jsonb as Record<string, unknown> | undefined)?.median_adr_ron ?? null) as number | null;
 
   const [hoveredId,  setHoveredId]  = useState<string | null>(null);
+  const hoveredIdRef = useRef<string | null>(null);
+  hoveredIdRef.current = hoveredId;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [opsOpen, setOpsOpen] = useState(false);
@@ -262,8 +264,12 @@ const registerCameraRef = useRef(registerCamera);
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = 0;
-        setFrame(f => (f + 1) % 1_000_000);
-        try { onCameraRef.current?.(map.getZoom()); } catch { /* noop */ }
+        const z = map.getZoom();
+        // Only reconcile React on move if something is glued to the map (a hover
+        // card or the market-band action pin). At the property/twin band with no
+        // hover there is nothing to follow, so we skip the whole-tree re-render.
+        if (hoveredIdRef.current !== null || (z >= 10.5 && z < 14)) setFrame(f => (f + 1) % 1_000_000);
+        try { onCameraRef.current?.(z); } catch { /* noop */ }
       });
     };
     map.on("move", bump);
