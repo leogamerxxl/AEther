@@ -21,8 +21,8 @@ import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
 import { buildCoastalZones, buildZoneLabels, ZONE_IDS } from "@/lib/coastal-zones";
 import { bandMeta, bandForZoom, type AltitudeBand } from "@/lib/altitude";
 import { createResortLayer, RESORT_LAYER_ID, RESORT_MIN_ZOOM } from "@/lib/world/resort-scene";
-import { createMarketOverlay, MARKET_MIN_ZOOM, MARKET_MAX_ZOOM } from "@/lib/world/market-layer";
-import { currentPhase, MAPBOX_PRESET } from "@/lib/world/daylight";
+import { createMarketOverlay, MARKET_MIN_ZOOM, MARKET_MAX_ZOOM, type MarketOverlayHandle, type FlowArc } from "@/lib/world/market-layer";
+import { currentPhase, MAPBOX_PRESET, SKY } from "@/lib/world/daylight";
 import { deriveIntel } from "@/lib/spatial-intel";
 import type { PropertyIntelligenceNode } from "@/types/spatial";
 import AssetDashboard from "./AssetDashboard";
@@ -37,7 +37,7 @@ const CENTER: [number, number] = [28.596282, 43.869390];
 
 // ─── CoastalCommandCenter ────────────────────────────────────────────────────
 
-export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, onCamera, registerFlyTo, registerCamera, onFocus, onPickIo }: { cinematic?: boolean; start?: boolean; locked?: boolean; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (band: AltitudeBand) => void) => void; registerCamera?: (ops: { zoomBy: (d: number) => void; home: () => void; toggle3D: () => void }) => void; onFocus?: (id: string | null) => void; onPickIo?: (io: IntelligenceObject) => void } = {}) {
+export default function CoastalCommandCenter({ cinematic = false, start = false, locked = false, suppressPopups = false, onOverlayChange, onCamera, registerFlyTo, registerCamera, onFocus, onPickIo }: { cinematic?: boolean; start?: boolean; locked?: boolean; suppressPopups?: boolean; onOverlayChange?: (open: boolean) => void; onCamera?: (zoom: number) => void; registerFlyTo?: (fn: (band: AltitudeBand) => void) => void; registerCamera?: (ops: { zoomBy: (d: number) => void; home: () => void; toggle3D: () => void }) => void; onFocus?: (id: string | null) => void; onPickIo?: (io: IntelligenceObject) => void } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<mapboxgl.Map | null>(null);
   const markersRef   = useRef<mapboxgl.Marker[]>([]);
@@ -51,7 +51,9 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
   registerFlyToRef.current = registerFlyTo;
   const onFocusRef = useRef(onFocus);
   onFocusRef.current = onFocus;
-  const registerCameraRef = useRef(registerCamera);
+  const HEAT_SRC = "aether-heat-src";
+const HEAT_LAYER = "aether-heat";
+const registerCameraRef = useRef(registerCamera);
   registerCameraRef.current = registerCamera;
 
   // Single read layer: nodes (sample scaffold overlaid with live IO insight) come
@@ -95,14 +97,41 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
     return out;
   }, [latestMarket, nodes]);
   const compById = useMemo(() => Object.fromEntries(liveStates.map(s => [s.id, s])), [liveStates]);
+
   const medianTonight = ((latestMarket?.raw_jsonb as Record<string, unknown> | undefined)?.median_adr_ron ?? null) as number | null;
 
   const [hoveredId,  setHoveredId]  = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [opsOpen, setOpsOpen] = useState(false);
+  // Popups never fight for space: when a higher surface opens (IO drawer, a
+  // mode pane), the map-level popovers yield immediately.
+  useEffect(() => {
+    if (suppressPopups) { setExpanded(false); setHoveredId(null); setOpsOpen(false); }
+  }, [suppressPopups]);
+  useEffect(() => { onOverlayChangeRef.current?.(expanded || opsOpen); }, [expanded, opsOpen]);
   const [, setFrame] = useState(0);
+  const mkRef = useRef<MarketOverlayHandle | null>(null);
+  const onOverlayChangeRef = useRef(onOverlayChange);
+  onOverlayChangeRef.current = onOverlayChange;
   const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const mk = mkRef.current;
+    const map = mapRef.current;
+    if (!mk || !map || !ready) return;
+    const arcs: FlowArc[] = [];
+    const feats: GeoJSON.Feature[] = [];
+    const home = nodes.find(n => n.isOwn)?.coordinates as [number, number] | undefined;
+    for (const s of liveStates) {
+      const n = nodes.find(n2 => n2.id === s.id);
+      if (!n) continue;
+      feats.push({ type: "Feature", geometry: { type: "Point", coordinates: n.coordinates as [number, number] },
+                   properties: { weight: s.sold ? 1 : s.rooms != null && s.rooms <= 2 ? 0.6 : 0.28 } });
+      if (s.sold && home) arcs.push({ from: n.coordinates as [number, number], to: home });
+    }
+    mk.setArcs(arcs);
+    try { (map.getSource(HEAT_SRC) as mapboxgl.GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: feats }); } catch { /* noop */ }
+  }, [ready, liveStates, nodes]);
   const [tokenMissing, setTokenMissing] = useState(false);
 
   // ── Camera flight + select ────────────────────────────────────────────────
@@ -153,7 +182,11 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
       // Real-building highlight colors (Standard featureset states)
       try { map.setConfigProperty("basemap", "colorBuildingHighlight", C.live); } catch { /* noop */ }
       try { map.setConfigProperty("basemap", "colorBuildingSelect", PACE_COLORS.balanced); } catch { /* noop */ }
-      try { map.setFog({ "color": "#0a0a0c", "high-color": "#000000", "space-color": "#000000", "horizon-blend": 0.02, "star-intensity": 0.12 }); } catch { /* noop */ }
+      try {
+        const sky = SKY[currentPhase()];
+        map.setFog({ "color": sky.color, "high-color": sky.highColor, "space-color": sky.spaceColor,
+                     "horizon-blend": sky.horizonBlend, "star-intensity": sky.starIntensity });
+      } catch { /* noop */ }
     });
 
     map.on("load", () => {
@@ -164,10 +197,31 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
       // Wider market low-poly massing (deck.gl, interleaved) - context beyond the patch
       try {
         const mk = createMarketOverlay(currentPhase());
+        mkRef.current = mk;
         map.addControl(mk.overlay);
+        // native pressure heatmap (deck HeatmapLayer cannot coexist as a 2nd overlay)
+        try {
+          if (!map.getSource(HEAT_SRC)) map.addSource(HEAT_SRC, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+          if (!map.getLayer(HEAT_LAYER)) {
+            map.addLayer({
+              id: HEAT_LAYER, type: "heatmap", source: HEAT_SRC, slot: "middle",
+              maxzoom: 14.2,
+              paint: {
+                "heatmap-weight": ["get", "weight"],
+                "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8.5, 1.6, 13, 2.2],
+                "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 8.5, 34, 11, 56, 13.5, 96],
+                "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 7.6, 0, 8.6, 0.82, 13.2, 0.82, 14.2, 0],
+                "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
+                  0, "rgba(91,127,166,0)", 0.25, "rgba(91,127,166,0.5)", 0.5, "rgba(166,152,130,0.7)",
+                  0.75, "rgba(206,167,110,0.85)", 1, "rgba(230,181,102,0.95)"],
+              },
+            });
+          }
+        } catch { /* noop */ }
         const gate = () => {
           const z = map.getZoom();
           mk.setVisible(z >= MARKET_MIN_ZOOM && z <= MARKET_MAX_ZOOM);
+          mk.setFlowsVisible(z >= 8.6 && z < 14.2); // demand arcs, region through market
         };
         map.on("zoomend", gate);
         gate();
@@ -515,7 +569,7 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
 
         {/* ── Rich hover card: name, state, rate, mini-map ────── */}
         <AnimatePresence>
-          {!locked && hovered && hp && !expanded ? (
+          {!locked && !suppressPopups && hovered && hp && !expanded ? (
             <RichHover key={hovered.id} node={hovered}
               comp={compById[hovered.id] ?? null} median={medianTonight} x={hp.x} y={hp.y} />
           ) : null}
@@ -523,7 +577,7 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
 
         {/* ── Detailed asset dashboard: characteristics + actions, grouped by domain ── */}
         <AnimatePresence>
-          {selected && expanded ? (
+          {selected && expanded && !suppressPopups ? (
             <AssetDashboard key={"dash-" + selected.id} node={selected} live={null}
               onClose={() => setExpanded(false)}
               onAction={(label) => toast(label)}
@@ -531,7 +585,7 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
           ) : null}
         </AnimatePresence>
         <AnimatePresence>
-          {selected && opsOpen ? (
+          {selected && opsOpen && !suppressPopups ? (
             <OperationsConsole key={"ops-" + selected.id} propertyName={selected.name}
               onClose={() => setOpsOpen(false)} />
           ) : null}

@@ -74,3 +74,14 @@ Moduri:
       deck.gl), trafic/congestie, curgand in logistica twin-ului
 - [ ] Brief email redesign enterprise (header = randarea Blender, tipografie
       premium, RO) - nexus-brief
+### World v3 - livrat 2026-07-05 (felia detalii + flows + discipline)
+- [x] deck.gl flat-sole bug: elevatie din geometry-seed (id top-level nu ajunge la accessor)
+- [x] Cer/fundal pe faze: orizont deschis ziua, apus la amurg (nu void negru)
+- [x] Piscine ca GROAPA (bazin jos + apa scufundata + rim la nivel)
+- [x] Umbreluțe, sezlonguri, palmieri in jurul piscinelor; masini statice in parcari
+- [x] Semnalistica 3D (branduri pe cladiri numite + TERRA)
+- [x] Heatmap presiune (nativ Mapbox) + demand arcs (deck) din setul competitiv real
+- [x] Pop-up discipline: asset dashboard detine ecranul -> rail/feed/timeline se retrag;
+      suppressPopups acopera si Operations console
+- [ ] Ramase: sticla (glass material), bancute, baldachine; Amazonic modelat; pool bar volum;
+      fatada Caraiman; cross-region flows; fatade 3D pe cladirile deck.gl

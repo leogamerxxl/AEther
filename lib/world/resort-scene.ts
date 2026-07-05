@@ -26,7 +26,7 @@ interface Feat {
   geometry: { type: string; coordinates: number[][][] };
 }
 interface PoolRec { id: number; ring: number[][]; name: string | null }
-interface Details { pools: PoolRec[]; trees: number[][]; woods: PoolRec[]; venues: PoolRec[] }
+interface Details { pools: PoolRec[]; trees: number[][]; woods: PoolRec[]; venues: PoolRec[]; parkings?: PoolRec[] }
 
 function hash(n: number): number { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); }
 
@@ -189,17 +189,106 @@ export function createResortLayer(phase: DayPhase): CustomLayerInterface {
         emissive: P.water, emissiveIntensity: P.waterEmissive,
         transparent: true, opacity: 0.94,
       });
+      const trunkLikeMat = new THREE.MeshStandardMaterial({ color: P.trunk, roughness: 0.9 });
+      const umbrellaMat = new THREE.MeshStandardMaterial({ color: "#d8cfc0", roughness: 0.75, side: THREE.DoubleSide });
+      const loungerMat = new THREE.MeshStandardMaterial({ color: "#c8bfae", roughness: 0.7 });
+      const loungerGeo = new THREE.BoxGeometry(1.9, 0.65, 0.35);
+      const rimMat = new THREE.MeshStandardMaterial({ color: P.body, roughness: 0.8 });
       for (const pool of det.pools) {
         const ring = pool.ring.map(toLocal);
         const shape = toShape(ring);
         if (!shape) continue;
-        const basin = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 1.4, bevelEnabled: false }), basinMat);
-        basin.position.z = -1.15;
+        // PIT: thin deck rim at grade, dark basin walls going DOWN, water sunk -0.5m
+        const rim = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.14, bevelEnabled: false }), rimMat);
+        scene.add(rim);
+        const basin = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 1.6, bevelEnabled: false }), basinMat);
+        basin.position.z = -1.6;
         scene.add(basin);
         const water = new THREE.Mesh(new THREE.ShapeGeometry(shape), waterMat);
-        water.position.z = 0.3;
+        water.position.z = -0.5;
         scene.add(water);
+        // resort furniture around the pool: umbrellas + sun loungers, deterministic
+        const cx = ring.reduce((s2, q) => s2 + q[0], 0) / ring.length;
+        const cy = ring.reduce((s2, q) => s2 + q[1], 0) / ring.length;
+        const n = 5 + Math.round(hash(pool.id) * 3);
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + hash(pool.id + i) * 0.5;
+          const rr = 7 + hash(pool.id * 3 + i) * 4;
+          const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr;
+          if (pointInRing([px, py], ring)) continue; // never in the water
+          // umbrella: pole + cone canopy
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.1, 5), trunkLikeMat);
+          pole.rotateX(Math.PI / 2); pole.position.set(px, py, 1.05);
+          scene.add(pole);
+          const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.5, 0.7, 8), umbrellaMat);
+          canopy.rotateX(Math.PI / 2); canopy.position.set(px, py, 2.25);
+          scene.add(canopy);
+          // two loungers beside it
+          for (const k of [-1, 1]) {
+            const lounger = new THREE.Mesh(loungerGeo, loungerMat);
+            lounger.position.set(px + k * 1.1 * Math.cos(a + Math.PI / 2), py + k * 1.1 * Math.sin(a + Math.PI / 2), 0.22);
+            lounger.rotation.z = a;
+            scene.add(lounger);
+          }
+        }
       }
+
+      // static cars in real parking lots (varied dark paint, deterministic)
+      const carGeo = new THREE.BoxGeometry(4.2, 1.8, 1.4);
+      const carPaints = ["#3a4150", "#565d66", "#2c3038", "#6b7280", "#8a4a42"].map(
+        (c2) => new THREE.MeshStandardMaterial({ color: c2, roughness: 0.35, metalness: 0.5 }));
+      for (const lot of det.parkings ?? []) {
+        const ring = lot.ring.map(toLocal);
+        const xs = ring.map((q) => q[0]), ys = ring.map((q) => q[1]);
+        const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
+        const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+        let placed = 0;
+        for (let gx = x0 + 3; gx < x1 && placed < 9; gx += 7) {
+          for (let gy = y0 + 3; gy < y1 && placed < 9; gy += 5) {
+            if (hash(lot.id + gx * 3 + gy) < 0.45) continue; // half-empty lots
+            if (!pointInRing([gx, gy], ring)) continue;
+            const car = new THREE.Mesh(carGeo, carPaints[Math.floor(hash(gx + gy * 7) * carPaints.length)]);
+            car.position.set(gx, gy, 0.7);
+            car.rotation.z = hash(lot.id + gy) > 0.5 ? 0 : Math.PI / 2;
+            scene.add(car);
+            placed++;
+          }
+        }
+      }
+
+      // 3D signage: named assets carry their brand as a glowing rooftop sign
+      const makeSign = (text: string, x: number, y: number, z: number, hero: boolean) => {
+        const cv = document.createElement("canvas");
+        cv.width = 512; cv.height = 96;
+        const ctx = cv.getContext("2d");
+        if (!ctx) return;
+        ctx.font = "600 56px Geist, Arial, sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillStyle = hero ? "#bfe9f5" : "#ffe9c8";
+        ctx.shadowColor = hero ? "rgba(34,211,238,.9)" : "rgba(255,217,160,.8)";
+        ctx.shadowBlur = 18;
+        ctx.fillText(text.toUpperCase(), 256, 48);
+        const tex = new THREE.CanvasTexture(cv);
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: tex, transparent: true, depthTest: true,
+          opacity: P.winIntensity > 0 ? 0.95 : 0.85,
+        }));
+        const w = 26;
+        sprite.scale.set(w, w * (96 / 512), 1);
+        sprite.position.set(x, y, z + 4.5);
+        scene.add(sprite);
+      };
+      for (const f of feats) {
+        if (f.geometry.type !== "Polygon") continue;
+        const nm = f.properties.name;
+        if (!nm) continue;
+        const ringL = f.geometry.coordinates[0].map(toLocal);
+        const cx = ringL.reduce((s2, q) => s2 + q[0], 0) / ringL.length;
+        const cy = ringL.reduce((s2, q) => s2 + q[1], 0) / ringL.length;
+        const hero2 = pointInRing([0, 0], ringL);
+        makeSign(nm.replace(/^hotel\s+/i, ""), cx, cy, hero2 ? Math.max(heightFor(f), 9 * FLOOR_M) : heightFor(f), hero2);
+      }
+      makeSign("TERRA", 0, 0, 9 * FLOOR_M + 3, true);
 
       // trees: two instanced meshes (trunks + canopies), deterministic scatter in woods
       const pts: [number, number][] = det.trees.map(toLocal);
@@ -217,6 +306,32 @@ export function createResortLayer(phase: DayPhase): CustomLayerInterface {
           if (pts.length > 420) break;
         }
       }
+      // palms ring the pools (coastal read), conifer cones stay in the woods
+      const palmTrunkGeo = new THREE.CylinderGeometry(0.14, 0.2, 4.6, 5);
+      palmTrunkGeo.rotateX(Math.PI / 2); palmTrunkGeo.translate(0, 0, 2.3);
+      const frondGeo = new THREE.ConeGeometry(2.3, 0.5, 5);
+      frondGeo.rotateX(Math.PI / 2); frondGeo.translate(0, 0, 4.7);
+      const palmMat = new THREE.MeshStandardMaterial({ color: P.canopy, roughness: 0.85, side: THREE.DoubleSide });
+      for (const pool of det.pools) {
+        const ring = pool.ring.map(toLocal);
+        const cx = ring.reduce((s2, q) => s2 + q[0], 0) / ring.length;
+        const cy = ring.reduce((s2, q) => s2 + q[1], 0) / ring.length;
+        const n = 4 + Math.round(hash(pool.id * 7) * 3);
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + hash(pool.id + i * 3) * 0.8;
+          const rr = 11 + hash(pool.id + i) * 5;
+          const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr;
+          if (pointInRing([px, py], ring)) continue;
+          const tr = new THREE.Mesh(palmTrunkGeo, trunkLikeMat);
+          tr.position.set(px, py, 0);
+          tr.rotation.x = (hash(px) - 0.5) * 0.12;
+          scene.add(tr);
+          const fr = new THREE.Mesh(frondGeo, palmMat);
+          fr.position.set(px, py, 0);
+          scene.add(fr);
+        }
+      }
+
       if (pts.length > 0) {
         const trunkGeo = new THREE.CylinderGeometry(0.22, 0.3, 2.2, 5);
         trunkGeo.rotateX(Math.PI / 2); trunkGeo.translate(0, 0, 1.1);

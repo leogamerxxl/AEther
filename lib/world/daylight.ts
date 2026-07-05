@@ -89,3 +89,15 @@ export const MASSING: Record<DayPhase, { body: Rgba; hotel: Rgba }> = {
   dusk:  { body: [86, 76, 83, 240],    hotel: [104, 94, 104, 245] },
   night: { body: [22, 27, 38, 235],    hotel: [30, 37, 52, 240] },
 };
+// Mapbox fog/sky per phase - the world needs a horizon that contrasts, not a
+// black void behind daylight. Values are world pigment.
+export interface SkyFog {
+  color: string; highColor: string; spaceColor: string;
+  horizonBlend: number; starIntensity: number;
+}
+export const SKY: Record<DayPhase, SkyFog> = {
+  day:   { color: "#dfeaf2", highColor: "#a8c8e8", spaceColor: "#7fb2e0", horizonBlend: 0.08, starIntensity: 0 },
+  dawn:  { color: "#e8c8a8", highColor: "#b090c0", spaceColor: "#4a5580", horizonBlend: 0.06, starIntensity: 0.02 },
+  dusk:  { color: "#f0a868", highColor: "#8a5a80", spaceColor: "#2a2448", horizonBlend: 0.06, starIntensity: 0.05 },
+  night: { color: "#0a0a0c", highColor: "#000000", spaceColor: "#000000", horizonBlend: 0.02, starIntensity: 0.12 },
+};

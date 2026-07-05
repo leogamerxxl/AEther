@@ -46,6 +46,8 @@ export default function Entry() {
   const [settings, setSettings] = useState<{ open: boolean; section: SettingsSection }>({ open: false, section: "profile" });
   const [zoom, setZoom] = useState(14.2);
   const [mode, setMode] = useState<WorldMode>("map");
+  // When an asset dashboard (CCC) owns the screen, ambient map instruments yield.
+  const [assetOverlay, setAssetOverlay] = useState(false);
   const flyRef = useRef<((band: AltitudeBand) => void) | null>(null);
   const band = bandForZoom(zoom);
   const flyTo = (b: AltitudeBand) => flyRef.current?.(b);
@@ -106,7 +108,7 @@ export default function Entry() {
       {hydrated && isStaff ? (
         <StaffFeed role={role!} />
       ) : (
-        <CoastalCommandCenter cinematic start={revealed} locked={!session} onCamera={setZoom} registerFlyTo={(fn) => { flyRef.current = fn; }} registerCamera={(ops) => { camRef.current = ops; }} onFocus={setFocusId} onPickIo={setSelectedIo} />
+        <CoastalCommandCenter cinematic start={revealed} locked={!session} onCamera={setZoom} registerFlyTo={(fn) => { flyRef.current = fn; }} registerCamera={(ops) => { camRef.current = ops; }} onFocus={setFocusId} onPickIo={setSelectedIo} onOverlayChange={setAssetOverlay} suppressPopups={!!selectedIo || mode !== "map"} />
       )}
 
       {/* The map's operating rail - authenticated command surface (desktop) */}
@@ -114,7 +116,7 @@ export default function Entry() {
         <>
           {mode === "map" ? (
             <>
-              {band === "twin" ? (
+              {assetOverlay ? null : band === "twin" ? (
                 <TwinOverlay />
               ) : (
                 <>
@@ -122,7 +124,7 @@ export default function Entry() {
                   <RightFeed onPick={setSelectedIo} />
                 </>
               )}
-              {band === "market" ? <PressureTimeline onPick={setSelectedIo} /> : null}
+              {!assetOverlay && band === "market" ? <PressureTimeline onPick={setSelectedIo} /> : null}
               <AltitudeRail band={band} onFlyTo={flyTo} />
               <WorldControls zoomBy={(d) => camRef.current?.zoomBy(d)} home={() => camRef.current?.home()} toggle3D={() => camRef.current?.toggle3D()} />
             </>
