@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { SpiralAnimation } from "@/components/ui/spiral-animation";
@@ -26,6 +26,13 @@ export default function EntranceSplash({ onReveal, onDone }: { onReveal: () => v
       className="fixed inset-0 z-[100] h-[100dvh] w-full overflow-hidden bg-black ease-out"
       style={{ opacity: leaving ? 0 : 1, transition: "opacity 1100ms ease-out" }}
     >
+      {/* Blender-rendered Neptun night massing (scripts/blender_hero_render.py,
+          real OSM footprints) - the world the spiral resolves into */}
+      <img src="/world/neptun-hero.jpg" alt="" aria-hidden
+        className="absolute inset-0 h-full w-full object-cover"
+        style={{ opacity: 0.55, transform: leaving ? "scale(1.02)" : "scale(1.08)",
+                 transition: "transform 4200ms linear, opacity 1100ms ease-out" }} />
+      <div className="absolute inset-0" style={{ background: "rgba(2,4,8,.45)" }} />
       <div className="absolute inset-0"><SpiralAnimation /></div>
       <div
         className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 ease-out"
