@@ -13,6 +13,13 @@ export function phaseForHour(h: number): DayPhase {
   return "night";
 }
 export function currentPhase(): DayPhase {
+  // demo/QA override: localStorage aether.phase = dawn|day|dusk|night
+  if (typeof window !== "undefined") {
+    try {
+      const o = window.localStorage.getItem("aether.phase");
+      if (o === "dawn" || o === "day" || o === "dusk" || o === "night") return o;
+    } catch { /* noop */ }
+  }
   return phaseForHour(new Date().getHours());
 }
 
