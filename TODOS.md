@@ -38,3 +38,39 @@
 - [ ] Global/local sync: market→coast→country rollup views over ontology graph edges.
 Design north star: UXP Smart City Platform (behance.net/gallery/202149327) — density + map-
 first ops feel, executed strictly under NIGHT HARBOR tokens (two-temperature discipline).
+## World v3 - backlog dictat de owner (2026-07-05)
+
+Interactiune (grammatica in 3 pasi):
+- [ ] Hover / primul click pe orice obiect = doar informatia esentiala; al doilea
+      click = full info; al treilea click pe setul de date = provenienta,
+      confidence, credibilitatea sursei (drawer-ul existent devine pasul 3)
+- [ ] Click pe hotelul pilot -> intra in modul digital twin cu ETAJE 3D
+      (grammatica UXP building view), nu doar overlay-ul actual
+- [ ] Click pe piscina / pool bar -> widgeturile + informatiile aferente
+- [ ] Click pe Terasa Amazonic -> twin propriu: mese, bar, restaurant, zona all
+      inclusive, terasa cu umbrelute, partea acoperita, scena live; hover info
+- [ ] Click pe hotel competitor monitorizat -> twin doar exterior + date
+      competitive: grad de ocupare, rata, RevPAR, social media impact etc.
+- [ ] Hover pe orice cladire din scena (raycasting three.js + nume OSM)
+
+Lume / randare:
+- [x] Light mode adaptiv pe ora reala (day/dusk cu ambient de apus/night) pe
+      TOATE straturile: Mapbox preset + scena three.js + deck.gl (crem ziua,
+      negru cu ferestre noaptea) - lib/world/daylight.ts
+- [x] Micro-detalii OSM in patch: piscine cu bazin+apa, copaci instanced, palcuri
+- [x] Fatade 2.5D basorelief: hoteluri ca stive de etaje cu cornise tesite
+- [x] deck.gl close-zoom: handoff la patch mai devreme (max 15.6)
+- [ ] Fatade 3D randate on top si pe cladirile deck.gl (nu doar in patch)
+- [ ] Branduri/logo-uri pe cladirile importante (Terra, Amazonic, Insula) -
+      semnalistica 3D proprie (NU asset-uri din Street View - IP); glow signage
+- [ ] Extruziunile de regiune: mai vizibile + textura mai interesanta (referinta)
+- [ ] Heatmap + cross-region direct pe harta
+- [ ] Terasa Amazonic modelata (acum extruziune joasa), pool bar ca volum,
+      fatada Caraiman
+
+Moduri:
+- [ ] Observe si Simulare integrate DIRECT in harta principala (nu pane-uri):
+      fronturi atmosferice animate din meteo real, demand/supply flows (arce
+      deck.gl), trafic/congestie, curgand in logistica twin-ului
+- [ ] Brief email redesign enterprise (header = randarea Blender, tipografie
+      premium, RO) - nexus-brief

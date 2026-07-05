@@ -22,6 +22,7 @@ import { buildCoastalZones, buildZoneLabels, ZONE_IDS } from "@/lib/coastal-zone
 import { bandMeta, bandForZoom, type AltitudeBand } from "@/lib/altitude";
 import { createResortLayer, RESORT_LAYER_ID, RESORT_MIN_ZOOM } from "@/lib/world/resort-scene";
 import { createMarketOverlay, MARKET_MIN_ZOOM, MARKET_MAX_ZOOM } from "@/lib/world/market-layer";
+import { currentPhase, MAPBOX_PRESET } from "@/lib/world/daylight";
 import { deriveIntel } from "@/lib/spatial-intel";
 import type { PropertyIntelligenceNode } from "@/types/spatial";
 import AssetDashboard from "./AssetDashboard";
@@ -145,10 +146,8 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
 
     // v3 Standard style config: night preset + clean POI
     map.on("style.load", () => {
-      // Real time of day: the world is lit like the coast is lit right now
-      const h = new Date().getHours();
-      const preset = h < 5 ? "night" : h < 8 ? "dawn" : h < 18 ? "day" : h < 21 ? "dusk" : "night";
-      try { map.setConfigProperty("basemap", "lightPreset", preset); }              catch { /* noop */ }
+      // Real time of day: ONE clock (lib/world/daylight) lights every layer
+      try { map.setConfigProperty("basemap", "lightPreset", MAPBOX_PRESET[currentPhase()]); } catch { /* noop */ }
       try { map.setConfigProperty("basemap", "showPointOfInterestLabels", false); } catch { /* noop */ }
       try { map.setConfigProperty("basemap", "showTransitLabels", false); }       catch { /* noop */ }
       // Real-building highlight colors (Standard featureset states)
@@ -161,10 +160,10 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
       setReady(true);
       // Crafted resort scene (three.js custom layer) owns the close-up world;
       // basemap 3D massing yields to it past the threshold (no double buildings).
-      try { if (!map.getLayer(RESORT_LAYER_ID)) map.addLayer(createResortLayer()); } catch { /* noop */ }
+      try { if (!map.getLayer(RESORT_LAYER_ID)) map.addLayer(createResortLayer(currentPhase())); } catch { /* noop */ }
       // Wider market low-poly massing (deck.gl, interleaved) - context beyond the patch
       try {
-        const mk = createMarketOverlay();
+        const mk = createMarketOverlay(currentPhase());
         map.addControl(mk.overlay);
         const gate = () => {
           const z = map.getZoom();
