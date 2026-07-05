@@ -21,6 +21,7 @@ import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
 import { buildCoastalZones, buildZoneLabels, ZONE_IDS } from "@/lib/coastal-zones";
 import { bandMeta, bandForZoom, type AltitudeBand } from "@/lib/altitude";
 import { createResortLayer, RESORT_LAYER_ID, RESORT_MIN_ZOOM } from "@/lib/world/resort-scene";
+import { createMarketOverlay, MARKET_MIN_ZOOM, MARKET_MAX_ZOOM } from "@/lib/world/market-layer";
 import { deriveIntel } from "@/lib/spatial-intel";
 import type { PropertyIntelligenceNode } from "@/types/spatial";
 import AssetDashboard from "./AssetDashboard";
@@ -161,6 +162,17 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
       // Crafted resort scene (three.js custom layer) owns the close-up world;
       // basemap 3D massing yields to it past the threshold (no double buildings).
       try { if (!map.getLayer(RESORT_LAYER_ID)) map.addLayer(createResortLayer()); } catch { /* noop */ }
+      // Wider market low-poly massing (deck.gl, interleaved) - context beyond the patch
+      try {
+        const mk = createMarketOverlay();
+        map.addControl(mk.overlay);
+        const gate = () => {
+          const z = map.getZoom();
+          mk.setVisible(z >= MARKET_MIN_ZOOM && z <= MARKET_MAX_ZOOM);
+        };
+        map.on("zoomend", gate);
+        gate();
+      } catch { /* noop */ }
       let resortActive = false;
       const swap3D = () => {
         const on = map.getZoom() >= RESORT_MIN_ZOOM;
