@@ -25,9 +25,7 @@ import { createMarketOverlay, MARKET_MIN_ZOOM, MARKET_MAX_ZOOM, type MarketOverl
 import { currentPhase, MAPBOX_PRESET, SKY } from "@/lib/world/daylight";
 import { deriveIntel } from "@/lib/spatial-intel";
 import type { PropertyIntelligenceNode } from "@/types/spatial";
-import AssetDashboard from "./AssetDashboard";
-import OperationsConsole from "./OperationsConsole";
-import { toast } from "@/lib/toast";
+import AssetPanel from "./AssetPanel";
 import { buildPropertyGlowPoints, PACE_COLORS } from "@/lib/property-extrusions";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
@@ -105,13 +103,12 @@ const registerCameraRef = useRef(registerCamera);
   hoveredIdRef.current = hoveredId;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [opsOpen, setOpsOpen] = useState(false);
   // Popups never fight for space: when a higher surface opens (IO drawer, a
   // mode pane), the map-level popovers yield immediately.
   useEffect(() => {
-    if (suppressPopups) { setExpanded(false); setHoveredId(null); setOpsOpen(false); }
+    if (suppressPopups) { setExpanded(false); setHoveredId(null); }
   }, [suppressPopups]);
-  useEffect(() => { onOverlayChangeRef.current?.(expanded || opsOpen); }, [expanded, opsOpen]);
+  useEffect(() => { onOverlayChangeRef.current?.(expanded); }, [expanded]);
   const [, setFrame] = useState(0);
   const mkRef = useRef<MarketOverlayHandle | null>(null);
   const onOverlayChangeRef = useRef(onOverlayChange);
@@ -141,18 +138,17 @@ const registerCameraRef = useRef(registerCamera);
   // No windows spawn; the altitude system renders the focused entity.
   const select = (n: PropertyIntelligenceNode) => {
     if (lockedRef.current) return;
+    onFocusRef.current?.(n.id);
+    if (n.isOwn) {
+      // the pilot: descend into the real digital twin (Interior band overlay)
+      setSelectedId(null); setExpanded(false);
+      mapRef.current?.flyTo({ center: n.coordinates, zoom: 17.4, pitch: 55, bearing: -35, duration: 2200, essential: true });
+      return;
+    }
+    // a competitor: fly in and open the real, scraped-data panel
     setSelectedId(n.id);
     setExpanded(true);
-    setOpsOpen(false);
-    onFocusRef.current?.(n.id);
-    mapRef.current?.flyTo({
-      center:   n.coordinates,
-      zoom:     15.6,
-      pitch:    62,
-      bearing:  -20,
-      duration: 2200,
-      essential: true,
-    });
+    mapRef.current?.flyTo({ center: n.coordinates, zoom: 15.6, pitch: 62, bearing: -20, duration: 2200, essential: true });
   };
 
   // ── Mapbox initialization ─────────────────────────────────────────────────
@@ -581,19 +577,13 @@ const registerCameraRef = useRef(registerCamera);
           ) : null}
         </AnimatePresence>
 
-        {/* ── Detailed asset dashboard: characteristics + actions, grouped by domain ── */}
+        {/* ── Competitor detail: REAL scraped data only (Romanian, honest gaps) ── */}
         <AnimatePresence>
           {selected && expanded && !suppressPopups ? (
-            <AssetDashboard key={"dash-" + selected.id} node={selected} live={null}
-              onClose={() => setExpanded(false)}
-              onAction={(label) => toast(label)}
-              onOpenOps={() => setOpsOpen(true)} />
-          ) : null}
-        </AnimatePresence>
-        <AnimatePresence>
-          {selected && opsOpen && !suppressPopups ? (
-            <OperationsConsole key={"ops-" + selected.id} propertyName={selected.name}
-              onClose={() => setOpsOpen(false)} />
+            <AssetPanel key={"panel-" + selected.id} node={selected}
+              live={compById[selected.id] ?? null} median={medianTonight}
+              monitored={!!compById[selected.id]}
+              onClose={() => { setExpanded(false); setSelectedId(null); }} />
           ) : null}
         </AnimatePresence>
 

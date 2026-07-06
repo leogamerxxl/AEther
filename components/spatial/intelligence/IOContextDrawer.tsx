@@ -15,6 +15,7 @@ import { SPRING, TRANSITION } from "@/lib/motion";
 import { ioFreshness, evidenceCount, type IntelligenceObject, type Freshness } from "@/lib/intelligence-map";
 import { signalLabel } from "@/lib/mode-data";
 
+const FRESH_LABEL: Record<Freshness, string> = { fresh: "proaspat", cooling: "se raceste", stale: "vechi", dead: "expirat" };
 const FRESH_COLOR: Record<Freshness, string> = {
   fresh: C.live,
   cooling: C.warn,
@@ -113,24 +114,24 @@ function Drawer({ io, onClose }: { io: IntelligenceObject; onClose: () => void }
 
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-[10px] border border-white/[.06] bg-white/[.02] px-3 py-2.5">
-          <Eyebrow>Confidence</Eyebrow>
+          <Eyebrow>Incredere</Eyebrow>
           <div className="mt-1 text-[20px] font-semibold tabular-nums" style={{ color: confidenceColor(pct) }}>{pct}%</div>
         </div>
         <div className="rounded-[10px] border border-white/[.06] bg-white/[.02] px-3 py-2.5">
-          <Eyebrow>Freshness</Eyebrow>
-          <div className="mt-1 text-[20px] font-semibold tabular-nums" style={{ color: FRESH_COLOR[fresh] }}>{fresh}</div>
+          <Eyebrow>Prospetime</Eyebrow>
+          <div className="mt-1 text-[17px] font-semibold" style={{ color: FRESH_COLOR[fresh] }}>{FRESH_LABEL[fresh]}</div>
         </div>
       </div>
 
       {io.causal_hypothesis ? (
         <div>
-          <Eyebrow>Causal hypothesis</Eyebrow>
+          <Eyebrow>Ipoteza cauzala</Eyebrow>
           <p className="mt-1.5 text-[13px] leading-relaxed text-white/75">{io.causal_hypothesis}</p>
         </div>
       ) : null}
 
       <div>
-        <Eyebrow>Recommended actions</Eyebrow>
+        <Eyebrow>Actiuni recomandate</Eyebrow>
         {recs.length > 0 ? (
           <>
             <ul className="mt-1.5 flex flex-col gap-1.5">
@@ -188,12 +189,12 @@ function Drawer({ io, onClose }: { io: IntelligenceObject; onClose: () => void }
             ) : null}
           </>
         ) : (
-          <p className="mt-1.5 text-[12.5px] text-white/45">No recommendation - data below the action threshold (Truth Doctrine).</p>
+          <p className="mt-1.5 text-[12.5px] text-white/45">Fara recomandare - date sub pragul de actiune.</p>
         )}
       </div>
 
       <div>
-        <Eyebrow>Evidence chain ({evidenceCount(io)} observations)</Eyebrow>
+        <Eyebrow>Lant de dovezi ({evidenceCount(io)} observatii)</Eyebrow>
         <div className="mt-1.5 flex flex-col gap-1.5">
           {(io.evidence ?? []).map((e, i) => (
             <div key={i} className="rounded-[10px] border border-white/[.06] bg-white/[.02] px-3 py-2">
@@ -212,26 +213,26 @@ function Drawer({ io, onClose }: { io: IntelligenceObject; onClose: () => void }
               ) : null}
             </div>
           ))}
-          {(io.evidence ?? []).length === 0 ? <p className="text-[12px] text-white/40">No evidence attached.</p> : null}
+          {(io.evidence ?? []).length === 0 ? <p className="text-[12px] text-white/40">Fara dovezi atasate.</p> : null}
         </div>
       </div>
 
       <div className="border-t border-white/[.06] pt-3">
-        <Eyebrow>Provenance &amp; traceability</Eyebrow>
+        <Eyebrow>Proveniența si trasabilitate</Eyebrow>
         <div className="mt-1">
-          <Row label="IO id"><span className="font-mono">{io.id}</span></Row>
-          <Row label="Status">{io.status}</Row>
-          <Row label="Observed">{fmtTs(io.observed_at)}</Row>
-          <Row label="Expires">{fmtTs(io.expires_at)}</Row>
-          <Row label="Anchor">{io.visual_anchor?.label ?? io.visual_anchor?.property_id ?? "-"}</Row>
-          <Row label="Signal type"><span className="font-mono">{io.signal_type}</span></Row>
-          <Row label="Entity">{io.entity_id ?? "-"}</Row>
+          <Row label="ID obiect"><span className="font-mono">{io.id}</span></Row>
+          <Row label="Stare">{io.status}</Row>
+          <Row label="Observat">{fmtTs(io.observed_at)}</Row>
+          <Row label="Expira">{fmtTs(io.expires_at)}</Row>
+          <Row label="Ancora">{io.visual_anchor?.label ?? io.visual_anchor?.property_id ?? "-"}</Row>
+          <Row label="Tip semnal"><span className="font-mono">{io.signal_type}</span></Row>
+          <Row label="Entitate">{io.entity_id ?? "-"}</Row>
         </div>
       </div>
 
       {io.raw_jsonb ? (
         <details>
-          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[.14em] text-white/40">Raw IO payload</summary>
+          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[.14em] text-white/40">Date brute (JSON)</summary>
           <pre className="mt-2 overflow-x-auto rounded-[10px] border border-white/[.06] bg-black/40 p-3 font-mono text-[10.5px] leading-relaxed text-white/55">
 {JSON.stringify(io.raw_jsonb, null, 2)}
           </pre>
