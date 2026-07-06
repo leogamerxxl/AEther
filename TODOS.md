@@ -85,3 +85,22 @@ Moduri:
       suppressPopups acopera si Operations console
 - [ ] Ramase: sticla (glass material), bancute, baldachine; Amazonic modelat; pool bar volum;
       fatada Caraiman; cross-region flows; fatade 3D pe cladirile deck.gl
+### World v4 - landmark buildings (high-fidelity local replacement) 2026-07-05
+- [x] Diagnoza: buildings outside the 750m patch nu se afisau (mapbox 3D oprit
+      global peste 14.3 + deck massing ascuns) -> fix: Mapbox 3D peste tot
+- [x] Etichete hotel ca la Mapbox (symbol layer, occlusion-aware, pilot cyan)
+- [x] Landmark buildings HIGH-FIDELITY (lib/world/landmark-buildings.ts): pentru
+      hotelurile numite din Neptun - fatada cu geam recesat (zi) / ferestre
+      aprinse (noapte), cornisa, unitati de acoperis, firma PE cladire (placa cu
+      monograma + nume, stil BRD). Opace + inflate -> ocluzeaza local Mapbox
+      low-poly, NU global. Restul raman Mapbox.
+- [ ] SCALARE la Olimp / Constanta / Mamaia / Costinesti / Vama Veche:
+      (a) fetch OSM hotel footprints per statiune (mecanic, ca neptun-osm.json)
+      (b) layer-ul crafted e ancorat pe Neptun (un singur origin Mercator) -
+          pentru statiuni la >few km precizia scade; nevoie de multi-anchor sau
+          incarcare per-zona dupa centrul hartii. Asta e urmatorul pas.
+- [ ] Fidelitate suplimentara: balcoane pe fatada, cupole/acoperisuri inclinate
+      pentru cladiri non-hotel relevante (biserica, teatru), intrare glazurata
+      la parter modelata (acum doar shader)
+- [ ] Logo real (nu monograma): necesita asset-uri de brand cu drept de folosire
+      de la fiecare hotel-client (nu se pot lua din Street View - IP)

@@ -12,6 +12,8 @@ import type { CustomLayerInterface, Map as MapboxMap } from "mapbox-gl";
 import mapboxgl from "mapbox-gl";
 import { SCENE, type DayPhase } from "@/lib/world/daylight";
 import details from "@/lib/world/patch-details.json";
+import osm from "@/lib/world/neptun-osm.json";
+import { buildLandmarks, isLandmark, type LandmarkFeat } from "@/lib/world/landmark-buildings";
 
 const ANCHOR: [number, number] = [28.59612, 43.86944]; // Hotel Terra Neptun (corridor.ts OWN)
 
@@ -122,6 +124,13 @@ export function createResortLayer(phase: DayPhase): CustomLayerInterface {
       const fill = new THREE.DirectionalLight(P.fill.color, P.fill.intensity);
       fill.position.set(...P.fill.pos);
       scene.add(fill);
+
+      // ── HIGH-FIDELITY landmark buildings (named hotels): crafted models that
+      //     locally replace Mapbox low-poly (opaque + inflated -> occlude it). ──
+      const lmFeats = (osm as { features: LandmarkFeat[] }).features.filter(isLandmark);
+      const isHeroRing = (ring: number[][]) => pointInRing([0, 0], ring.map(toLocal));
+      const { group: lmGroup } = buildLandmarks(lmFeats, toLocal, isHeroRing, P);
+      scene.add(lmGroup);
 
       const det = details as unknown as Details;
 
