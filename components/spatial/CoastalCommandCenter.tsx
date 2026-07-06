@@ -21,6 +21,7 @@ import { useIntelligence } from "./intelligence/SpatialIntelligenceProvider";
 import { buildCoastalZones, buildZoneLabels, ZONE_IDS } from "@/lib/coastal-zones";
 import { bandMeta, bandForZoom, type AltitudeBand } from "@/lib/altitude";
 import { createResortLayer, RESORT_LAYER_ID, RESORT_MIN_ZOOM } from "@/lib/world/resort-scene";
+import osmBuildings from "@/lib/world/neptun-osm.json";
 import { createMarketOverlay, MARKET_MIN_ZOOM, MARKET_MAX_ZOOM, type MarketOverlayHandle, type FlowArc } from "@/lib/world/market-layer";
 import { currentPhase, MAPBOX_PRESET, SKY } from "@/lib/world/daylight";
 import { deriveIntel } from "@/lib/spatial-intel";
@@ -51,6 +52,8 @@ export default function CoastalCommandCenter({ cinematic = false, start = false,
   onFocusRef.current = onFocus;
   const HEAT_SRC = "aether-heat-src";
 const HEAT_LAYER = "aether-heat";
+const LABEL_SRC = "aether-hotel-labels-src";
+const LABEL_LAYER = "aether-hotel-labels";
 const registerCameraRef = useRef(registerCamera);
   registerCameraRef.current = registerCamera;
 
@@ -189,8 +192,10 @@ const registerCameraRef = useRef(registerCamera);
 
     map.on("load", () => {
       setReady(true);
-      // Crafted resort scene (three.js custom layer) owns the close-up world;
-      // basemap 3D massing yields to it past the threshold (no double buildings).
+      // Mapbox Standard renders ALL 3D buildings across the map (real facades,
+      // night-lit windows); the crafted three.js layer only ADDS ground detail
+      // (pools, palms, furniture, cars) at the pilot - no synthetic buildings,
+      // so nothing z-fights and buildings render everywhere.
       try { if (!map.getLayer(RESORT_LAYER_ID)) map.addLayer(createResortLayer(currentPhase())); } catch { /* noop */ }
       // Wider market low-poly massing (deck.gl, interleaved) - context beyond the patch
       try {
@@ -224,15 +229,46 @@ const registerCameraRef = useRef(registerCamera);
         map.on("zoomend", gate);
         gate();
       } catch { /* noop */ }
-      let resortActive = false;
-      const swap3D = () => {
-        const on = map.getZoom() >= RESORT_MIN_ZOOM;
-        if (on === resortActive) return;
-        resortActive = on;
-        try { map.setConfigProperty("basemap", "show3dObjects", !on); } catch { /* noop */ }
-      };
-      map.on("zoomend", swap3D);
-      swap3D();
+      // Hotel name labels - Mapbox symbol layer, collision-aware, halo for
+      // legibility, anchored to the real building centroids (like Mapbox does
+      // for landmarks). Real per-brand logos are Mapbox proprietary 3D landmark
+      // models (major cities only) - not available for Neptun; clean typographic
+      // labels are the honest, correctly-positioned equivalent.
+      try {
+        type OsmF = { properties: { name: string | null; building?: string | null }; geometry: { coordinates: number[][][] } };
+        const feats = (osmBuildings as { features: OsmF[] }).features;
+        const labelFeats = feats
+          .filter((f) => f.properties.name && (/hotel|vila|resort/i.test(f.properties.name) || f.properties.building === "hotel"))
+          .map((f) => {
+            const ring = f.geometry.coordinates[0];
+            const lng = ring.reduce((a, p2) => a + p2[0], 0) / ring.length;
+            const lat = ring.reduce((a, p2) => a + p2[1], 0) / ring.length;
+            const own = Math.hypot(lng - (HOME?.coordinates?.[0] ?? 0), lat - (HOME?.coordinates?.[1] ?? 0)) < 0.0006;
+            return { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [lng, lat] },
+              properties: { name: (f.properties.name as string).replace(/^Hotel\s+/i, ""), own: own ? 1 : 0 } };
+          });
+        if (!map.getSource(LABEL_SRC)) map.addSource(LABEL_SRC, { type: "geojson", data: { type: "FeatureCollection", features: labelFeats } });
+        if (!map.getLayer(LABEL_LAYER)) {
+          map.addLayer({
+            id: LABEL_LAYER, type: "symbol", source: LABEL_SRC, minzoom: 13.4,
+            layout: {
+              "text-field": ["get", "name"],
+              "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+              "text-size": ["interpolate", ["linear"], ["zoom"], 13.4, 11, 16, 14.5],
+              "text-letter-spacing": 0.04,
+              "text-anchor": "bottom",
+              "text-offset": [0, -0.4],
+              "text-allow-overlap": false,
+              "symbol-sort-key": ["case", ["==", ["get", "own"], 1], 0, 1],
+            },
+            paint: {
+              "text-color": ["case", ["==", ["get", "own"], 1], C.live, "rgba(255,255,255,.82)"],
+              "text-halo-color": "rgba(4,6,10,.92)",
+              "text-halo-width": 1.3,
+            },
+          });
+        }
+      } catch { /* noop */ }
       try { onCameraRef.current?.(map.getZoom()); } catch { /* noop */ }
       registerFlyToRef.current?.((band: AltitudeBand) => {
         try {

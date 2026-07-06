@@ -82,7 +82,10 @@ export function createMarketOverlay(phase: DayPhase): MarketOverlayHandle {
   let arcs: FlowArc[] = [];
 
   const build = (): Layer[] => {
-    const layers: Layer[] = [buildLayer(massingVis, phase)];
+    // massing removed: Mapbox Standard 3D buildings now render the whole map;
+    // deck.gl carries only the demand arcs (real overflow flows).
+    void massingVis;
+    const layers: Layer[] = [];
     layers.push(new ArcLayer<FlowArc>({
       id: "aether-demand-arcs",
       data: arcs,
